@@ -178,3 +178,42 @@ export async function getMissionStatusFromDb(
 
   return state;
 }
+
+export type RecentMissionRow = {
+  id: string;
+  url: string;
+  domain: string;
+  status: string;
+  createdAt: Date;
+  updatedAt: Date;
+  progress?: {
+    currentStage?: MissionState["currentStage"];
+    stageProgress?: number;
+    error?: string;
+  } | null;
+};
+
+export async function getRecentMissionsForUser(input: {
+  userId: string;
+  limit?: number;
+}): Promise<RecentMissionRow[]> {
+  const missions = await db.mission.findMany({
+    where: { userId: input.userId },
+    orderBy: { createdAt: "desc" },
+    take: input.limit ?? 12,
+    select: {
+      id: true,
+      url: true,
+      domain: true,
+      status: true,
+      progress: true,
+      createdAt: true,
+      updatedAt: true,
+    },
+  });
+
+  return missions.map((m) => ({
+    ...m,
+    progress: (m.progress ?? null) as RecentMissionRow["progress"],
+  }));
+}

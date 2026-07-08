@@ -23,9 +23,21 @@ export function UserMenu() {
 
   return (
     <div className="flex items-center gap-4">
-      <span className="hidden max-w-[160px] truncate text-sm text-muted-light sm:block">
+      <button
+        type="button"
+        onClick={() => router.push("/profile")}
+        className="hidden max-w-[220px] truncate text-sm text-muted-light transition-colors hover:text-ghost-white sm:block"
+        title={user.email}
+      >
         {user.email}
-      </span>
+      </button>
+      <button
+        type="button"
+        onClick={() => router.push("/profile")}
+        className="rounded-xl border border-border bg-surface/30 px-3 py-1.5 text-sm text-ghost-white/70 transition-colors hover:text-ghost-white"
+      >
+        Profile
+      </button>
       <button
         type="button"
         onClick={async () => {

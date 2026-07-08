@@ -80,10 +80,15 @@ function leakHtml(leak: ConversionLeak): string {
 export function buildReportHtml(report: GhostReport, logo: string | null): string {
   const color = scoreColor(report.score);
   const bu = report.businessUnderstanding;
-  const date = new Date(report.scannedAt).toLocaleDateString("en-IN", {
+  const scannedAt = new Date(report.scannedAt);
+  const date = scannedAt.toLocaleDateString("en-IN", {
     year: "numeric",
     month: "short",
     day: "numeric",
+  });
+  const time = scannedAt.toLocaleTimeString("en-IN", {
+    hour: "2-digit",
+    minute: "2-digit",
   });
 
   const brand = `<div class="brand">${
@@ -157,6 +162,9 @@ export function buildReportHtml(report: GhostReport, logo: string | null): strin
       <div class="hero-txt">
         <h1>${esc(report.domain)}</h1>
         <div class="goal">${esc(bu.primaryGoal)}</div>
+        <div class="goal" style="margin-top:4px;color:#666;font-size:10.5px;">
+          ${esc(report.url)} · ${esc(date)} ${esc(time)}
+        </div>
       </div>
     </div>
 

@@ -51,6 +51,7 @@ export const copy = {
     personas: "Personas",
     faq: "FAQ",
     home: "Home",
+    profile: "Profile",
     signIn: "Sign in",
     signOut: "Sign out",
   },

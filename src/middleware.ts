@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { SESSION_COOKIE, getSessionFromToken } from "@/lib/auth/session";
 
-const PROTECTED_PREFIXES = ["/mission", "/results"];
+const PROTECTED_PREFIXES = ["/mission", "/results", "/profile"];
 
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
@@ -23,5 +23,5 @@ export async function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/mission/:path*", "/results/:path*"],
+  matcher: ["/mission/:path*", "/results/:path*", "/profile/:path*"],
 };

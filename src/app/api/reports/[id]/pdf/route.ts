@@ -32,6 +32,7 @@ export async function GET(
       headers: {
         "Content-Type": "application/pdf",
         "Content-Disposition": `attachment; filename="ghost-report-${safeName}.pdf"`,
+        "X-Content-Type-Options": "nosniff",
         "Cache-Control": "no-store",
       },
     });
