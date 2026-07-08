@@ -78,6 +78,10 @@ export interface GhostReport {
   journey: JourneyStep[];
   leaks: ConversionLeak[];
   fixes: AIFix[];
+  /** True when the crawl couldn't read much of the site (heavy JS / blocked). */
+  lowConfidence?: boolean;
+  /** Shown as a banner when lowConfidence — explains the caveat to the owner. */
+  confidenceNote?: string;
 }
 
 export interface MissionState {

@@ -28,7 +28,7 @@ import {
   persistMissionProgress,
   persistMissionReport,
 } from "../db/missions";
-import { ingestUrl } from "../ghost-engine/ingest";
+import { assessCrawl, ingestUrl } from "../ghost-engine/ingest";
 import { runAudit } from "../ghost-engine/pipeline";
 import { toGhostReport } from "../ghost-engine/adapter";
 
@@ -154,11 +154,13 @@ async function runRealAudit(
   try {
     // Stage 1 → 1.4: crawl + synthesize the Context Pack.
     setStage(missionId, "understanding", 15);
+    let lowConfidence = false;
     const pack = await ingestUrl(url, {
       onCrawled: (crawl) => {
         // Surface the real homepage screenshot so the scan shows the actual site.
         const shot = crawl.pages.find((p) => p.screenshotB64)?.screenshotB64;
         if (shot) previewStore.set(missionId, `data:image/png;base64,${shot}`);
+        lowConfidence = assessCrawl(crawl).lowConfidence;
         setStage(missionId, "understanding", 100);
       },
     });
@@ -178,7 +180,7 @@ async function runRealAudit(
         setStage(missionId, "generating", (progress.done / progress.total) * 100),
     });
 
-    const report = toGhostReport(missionId, url, domain, pack, result);
+    const report = toGhostReport(missionId, url, domain, pack, result, { lowConfidence });
     reportStore.set(missionId, report);
 
     patchMission(missionId, {

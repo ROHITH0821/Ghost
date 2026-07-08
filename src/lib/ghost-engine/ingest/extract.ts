@@ -159,8 +159,15 @@ async function dynamicPass(
   });
   const page = await context.newPage();
   try {
-    await page.goto(url, { waitUntil: "networkidle", timeout: RENDER_TIMEOUT_MS });
+    // Use domcontentloaded, NOT networkidle: heavy sites (analytics, chat, ads,
+    // infinite-scroll) never go idle, so networkidle would time out and fail the
+    // whole render — leaving us with the blank JS shell. Instead: load the DOM,
+    // best-effort wait for the network to settle (capped), scroll to trigger
+    // lazy content, then give the SPA a moment to paint products/prices.
+    await page.goto(url, { waitUntil: "domcontentloaded", timeout: RENDER_TIMEOUT_MS });
+    await page.waitForLoadState("networkidle", { timeout: 5000 }).catch(() => {});
     await autoScroll(page);
+    await page.waitForTimeout(1200);
     const extracted = extractFromHtml(await page.content(), url);
     let screenshotB64: string | undefined;
     if (withScreenshot) {
@@ -183,13 +190,14 @@ async function dynamicPass(
  */
 export async function getPageInfo(
   url: string,
-  options: { wantScreenshot?: boolean; getBrowser?: BrowserProvider } = {},
+  options: { wantScreenshot?: boolean; forceRender?: boolean; getBrowser?: BrowserProvider } = {},
 ): Promise<RawPage> {
-  const { wantScreenshot = false, getBrowser } = options;
+  const { wantScreenshot = false, forceRender = false, getBrowser } = options;
 
   try {
     const staticData = await staticPass(url);
-    const needsRender = !!getBrowser && (wantScreenshot || staticData.text.length < THIN_TEXT_CHARS);
+    const needsRender =
+      !!getBrowser && (forceRender || wantScreenshot || staticData.text.length < THIN_TEXT_CHARS);
 
     if (needsRender && getBrowser) {
       try {

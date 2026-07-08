@@ -40,7 +40,9 @@ export interface CrawlOptions {
 
 const CACHE_DIR = join(".cache", "crawl");
 // Bump when crawl output shape/behavior changes, to invalidate stale caches.
-const CACHE_VERSION = "v2";
+// Bump when crawl behaviour changes so stale caches are invalidated. v3: JS-SPA
+// force-render + domcontentloaded (was capturing blank shells on busy sites).
+const CACHE_VERSION = "v3";
 
 async function extractInternalLinks(rootUrl: string): Promise<string[]> {
   try {
@@ -130,14 +132,30 @@ export async function crawlSite(url: string, options: CrawlOptions = {}): Promis
     const truncated = new Set(merged.map(normalizePageUrl)).size + 1 > maxPages;
     const selected = prioritizeUrls(rootUrl, merged, maxPages);
 
-    const settled = await mapWithConcurrency(selected, CRAWL_CONCURRENCY, (pageUrl, i) =>
-      getPageInfo(pageUrl, { wantScreenshot: i < screenshotTopK, getBrowser }),
+    // Fetch the homepage first to detect a JS-rendered SPA. If the static HTML was
+    // thin enough that we had to render it, the whole site is likely client-side
+    // rendered — so force-render every other page too, otherwise product /
+    // collection pages come back as blank shells and the audit is meaningless.
+    const root = await getPageInfo(selected[0], {
+      wantScreenshot: screenshotTopK > 0,
+      getBrowser,
+    });
+    const isSpa = root.renderedWith === "dynamic";
+
+    const restSettled = await mapWithConcurrency(selected.slice(1), CRAWL_CONCURRENCY, (pageUrl, i) =>
+      getPageInfo(pageUrl, {
+        wantScreenshot: i + 1 < screenshotTopK,
+        forceRender: isSpa,
+        getBrowser,
+      }),
     );
 
-    const pages = settled
-      .filter((r): r is PromiseFulfilledResult<RawPage> => r.status === "fulfilled")
-      .map((r) => r.value)
-      .filter((p) => p.title || p.text); // drop pages that failed to load entirely
+    const pages = [
+      root,
+      ...restSettled
+        .filter((r): r is PromiseFulfilledResult<RawPage> => r.status === "fulfilled")
+        .map((r) => r.value),
+    ].filter((p) => p.title || p.text); // drop pages that failed to load entirely
 
     const crawl: RawCrawl = {
       rootUrl,

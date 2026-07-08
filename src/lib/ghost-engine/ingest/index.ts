@@ -7,6 +7,19 @@ export type { RawPage } from "./extract";
 export { crawlSite } from "./crawl";
 export { buildContextPack } from "./buildContextPack";
 
+/**
+ * Judge whether the crawl actually captured meaningful content. A JS-rendered
+ * site we couldn't read (or one that blocked us) yields near-empty pages — and
+ * we must NOT then present a confident "your business is broken" audit. When
+ * `lowConfidence` is true, the report discloses that results may be incomplete.
+ */
+export function assessCrawl(crawl: RawCrawl): { lowConfidence: boolean } {
+  const richPages = crawl.pages.filter(
+    (p) => p.text.replace(/\s+/g, " ").trim().length > 800,
+  ).length;
+  return { lowConfidence: crawl.pages.length > 0 && richPages === 0 };
+}
+
 export interface IngestEvents {
   /** Fired after the crawl, before synthesis. */
   onCrawled?: (crawl: RawCrawl) => void;

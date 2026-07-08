@@ -120,6 +120,7 @@ export function buildReportHtml(report: GhostReport, logo: string | null): strin
     .score .band { font-size: 10px; text-transform: uppercase; letter-spacing: 1px; color: ${color}; margin-top: 3px; font-weight: 700; }
     .hero-txt h1 { font-size: 22px; margin: 0 0 4px; }
     .hero-txt .goal { font-size: 12.5px; color: #333; }
+    .note { background: #fff8e6; border: 1px solid #f0d98a; border-radius: 6px; padding: 9px 12px; margin: 14px 0 0; font-size: 10px; color: #6b5a1a; }
     .section-title { font-size: 12px; text-transform: uppercase; letter-spacing: 1.5px; color: #666; margin: 20px 0 8px; border-bottom: 1px solid #ddd; padding-bottom: 3px; }
     .bu { display: grid; grid-template-columns: 1fr 1fr; gap: 8px 20px; }
     .bu .lbl { font-size: 9.5px; text-transform: uppercase; letter-spacing: 1px; color: #888; }
@@ -158,6 +159,12 @@ export function buildReportHtml(report: GhostReport, logo: string | null): strin
         <div class="goal">${esc(bu.primaryGoal)}</div>
       </div>
     </div>
+
+    ${
+      report.lowConfidence && report.confidenceNote
+        ? `<div class="note"><b>Limited visibility — results may be incomplete.</b> ${esc(report.confidenceNote)}</div>`
+        : ""
+    }
 
     <div class="section-title">What Ghost detected</div>
     <div class="bu">

@@ -19,20 +19,22 @@ export function MissionPageClient({ missionId }: MissionPageClientProps) {
 
   useEffect(() => {
     let interval: NodeJS.Timeout;
-    let reportFetched = false;
 
-    const fetchReport = async () => {
-      if (reportFetched) return;
+    // Returns true once the report has been fetched and stored.
+    const fetchReport = async (): Promise<boolean> => {
       try {
         const res = await fetch(`/api/reports/${missionId}`);
         if (res.ok) {
           const data = await res.json();
-          setReport(data.report);
-          reportFetched = true;
+          if (data.report) {
+            setReport(data.report);
+            return true;
+          }
         }
       } catch {
-        // retry on next poll
+        // transient — retry on the next poll
       }
+      return false;
     };
 
     const poll = async () => {
@@ -53,8 +55,11 @@ export function MissionPageClient({ missionId }: MissionPageClientProps) {
         setMission(data.mission);
 
         if (data.mission.status === "complete") {
-          clearInterval(interval);
-          await fetchReport();
+          // Keep polling until the report is actually in hand — a single fetch
+          // can race the report being written, and stopping early leaves the UI
+          // stuck on the loading spinner until a manual reload.
+          const got = await fetchReport();
+          if (got) clearInterval(interval);
         } else if (data.mission.status === "error") {
           clearInterval(interval);
         }

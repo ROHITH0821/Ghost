@@ -126,6 +126,9 @@ function fixes(result: AuditResult): AIFix[] {
   });
 }
 
+const LOW_CONFIDENCE_NOTE =
+  "This site is heavily JavaScript-rendered, so our crawler — like search engines and visitors on slow connections — couldn't read much of its content. These results reflect what those non-JavaScript visitors experience; if products and prices load fine in your own browser, treat the score as a crawlability/SEO signal rather than a verdict on the whole site.";
+
 /** Transform the engine output into the UI's GhostReport. */
 export function toGhostReport(
   id: string,
@@ -133,6 +136,7 @@ export function toGhostReport(
   domain: string,
   pack: ContextPack,
   result: AuditResult,
+  meta: { lowConfidence?: boolean } = {},
 ): GhostReport {
   return {
     id,
@@ -144,5 +148,7 @@ export function toGhostReport(
     journey: journey(result),
     leaks: leaks(result),
     fixes: fixes(result),
+    lowConfidence: meta.lowConfidence || undefined,
+    confidenceNote: meta.lowConfidence ? LOW_CONFIDENCE_NOTE : undefined,
   };
 }

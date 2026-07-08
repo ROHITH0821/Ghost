@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
-import { Download, Volume2, VolumeX } from "lucide-react";
+import { Download, Info, Volume2, VolumeX } from "lucide-react";
 import type { GhostReport } from "@/lib/types";
 import { ScrollReveal, SectionHeading, TextLink } from "@/components/ui/BRAVE";
 import { GhostScore } from "@/components/results/GhostScore";
@@ -159,6 +159,22 @@ export function IntelligenceReportView({
           </div>
         )}
       </ScrollReveal>
+
+      {report.lowConfidence && report.confidenceNote && (
+        <ScrollReveal className="mt-8">
+          <div className="flex items-start gap-3 rounded-xl border border-warning/25 bg-warning/[0.07] p-4 md:p-5">
+            <Info className="mt-0.5 h-5 w-5 shrink-0 text-warning" />
+            <div>
+              <p className="mb-1 font-mono text-xs font-semibold uppercase tracking-wider text-warning">
+                Limited visibility — results may be incomplete
+              </p>
+              <p className="text-sm leading-relaxed text-muted">
+                {report.confidenceNote}
+              </p>
+            </div>
+          </div>
+        </ScrollReveal>
+      )}
 
       {!hideScore && (
         <ScrollReveal className={`flex justify-center ${compact ? "my-10 md:my-12" : "my-16 md:my-20"}`}>
