@@ -12,6 +12,10 @@ function missionProgress(state: MissionState) {
     stageProgress: state.stageProgress,
     personas: state.personas,
     startedAt: state.startedAt,
+    previewImageUrl: state.previewImageUrl,
+    progressLog: state.progressLog,
+    detectedFlows: state.detectedFlows,
+    customerSnippets: state.customerSnippets,
     error: state.error,
   };
 }

@@ -10,9 +10,11 @@ interface GhostScoreProps {
 }
 
 function getScoreColor(score: number): string {
-  if (score >= 80) return "#22C55E";
-  if (score >= 60) return "#38BDF8";
-  if (score >= 40) return "#F59E0B";
+  if (score >= 95) return "#22C55E";
+  if (score >= 85) return "#38BDF8";
+  if (score >= 70) return "#A78BFA";
+  if (score >= 55) return "#F59E0B";
+  if (score >= 40) return "#F97316";
   return "#EF4444";
 }
 

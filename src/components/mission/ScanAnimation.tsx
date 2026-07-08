@@ -1,8 +1,8 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
-import { motion, AnimatePresence } from "framer-motion";
-import type { MissionStage } from "@/lib/types";
+import { useEffect, useState } from "react";
+import { motion } from "framer-motion";
+import type { MissionStage, MissionState } from "@/lib/types";
 import { copy } from "@/lib/copy";
 
 interface ScanAnimationProps {
@@ -12,42 +12,7 @@ interface ScanAnimationProps {
   active: boolean;
   currentStage: MissionStage;
   stageProgress: number;
-}
-
-type LoadPhase = "connecting" | "fetching" | "rendering" | "live" | "fallback";
-
-const STAGE_LOGS = copy.scan.stageLogs;
-
-const ANALYSIS_STEP_LAYOUT = [
-  { top: "4%", left: "8%", w: "72%", h: "12%" },
-  { top: "18%", left: "10%", w: "38%", h: "22%" },
-  { top: "4%", left: "62%", w: "30%", h: "8%" },
-  { top: "42%", left: "8%", w: "55%", h: "18%" },
-  { top: "62%", left: "10%", w: "40%", h: "14%" },
-  { top: "78%", left: "8%", w: "84%", h: "12%" },
-  { top: "48%", left: "58%", w: "34%", h: "20%" },
-] as const;
-
-const ANALYSIS_STEPS = copy.scan.analysisSteps.map((step, i) => ({
-  ...step,
-  ...ANALYSIS_STEP_LAYOUT[i],
-}));
-
-function useTypewriter(text: string, speed = 28) {
-  const [displayed, setDisplayed] = useState("");
-
-  useEffect(() => {
-    setDisplayed("");
-    let i = 0;
-    const id = setInterval(() => {
-      i++;
-      setDisplayed(text.slice(0, i));
-      if (i >= text.length) clearInterval(id);
-    }, speed);
-    return () => clearInterval(id);
-  }, [text, speed]);
-
-  return displayed;
+  mission?: MissionState;
 }
 
 export function ScanAnimation({
@@ -57,59 +22,29 @@ export function ScanAnimation({
   active,
   currentStage,
   stageProgress,
+  mission,
 }: ScanAnimationProps) {
-  const [phase, setPhase] = useState<LoadPhase>("connecting");
-  const [logs, setLogs] = useState<string[]>([]);
-  const [stepIndex, setStepIndex] = useState(0);
-  const [elementsScanned, setElementsScanned] = useState(0);
   const [screenshotUrl, setScreenshotUrl] = useState<string | null>(null);
-  const [loadProgress, setLoadProgress] = useState(0);
-  const isLiveRef = useRef(false);
 
   const targetUrl = url.startsWith("http") ? url : `https://${url}`;
 
-  // Loading-overlay pipeline (connecting → fetching → rendering) until the real
-  // screenshot arrives from the poll below.
+  // Prefer preview data embedded in mission state (no extra call). Fallback to polling.
   useEffect(() => {
     if (!active) return;
-
-    setPhase("connecting");
-    setLoadProgress(0);
-    setScreenshotUrl(null);
-    isLiveRef.current = false;
-
-    const t1 = setTimeout(() => {
-      setPhase("fetching");
-      setLoadProgress(25);
-    }, 600);
-    const t2 = setTimeout(() => {
-      setPhase("rendering");
-      setLoadProgress(55);
-    }, 1400);
-
-    // Creep toward (but never reach) 95% while we wait — the poll snaps to 100.
-    const progressInterval = setInterval(() => {
-      setLoadProgress((p) => (isLiveRef.current ? p : Math.min(p + 1, 95)));
-    }, 140);
-
-    return () => {
-      clearTimeout(t1);
-      clearTimeout(t2);
-      clearInterval(progressInterval);
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [active, missionId]);
+    if (mission?.previewImageUrl) setScreenshotUrl(mission.previewImageUrl);
+  }, [active, mission?.previewImageUrl]);
 
   // Poll for THIS mission's real homepage screenshot (captured during the crawl).
   useEffect(() => {
     if (!active) return;
+    if (mission?.previewImageUrl) return;
     let cancelled = false;
     let timer: ReturnType<typeof setTimeout>;
     let tries = 0;
     const MAX_TRIES = 40; // ~60s safety net
 
     const poll = async () => {
-      if (cancelled || isLiveRef.current) return;
+      if (cancelled) return;
       tries += 1;
       try {
         const res = await fetch(
@@ -118,19 +53,12 @@ export function ScanAnimation({
         const data = await res.json();
         if (!cancelled && data.imageUrl) {
           setScreenshotUrl(data.imageUrl as string);
-          isLiveRef.current = true;
-          setPhase("live");
-          setLoadProgress(100);
           return; // stop polling — we're live
-        }
-        if (!cancelled && data.fallback) {
-          setPhase("fallback"); // crawl produced nothing and the fallback failed
-          return;
         }
       } catch {
         // transient — retry
       }
-      if (!cancelled && !isLiveRef.current && tries < MAX_TRIES) {
+      if (!cancelled && tries < MAX_TRIES) {
         timer = setTimeout(poll, 1500);
       }
     };
@@ -140,57 +68,17 @@ export function ScanAnimation({
       cancelled = true;
       clearTimeout(timer);
     };
-  }, [active, missionId, targetUrl]);
+  }, [active, mission?.previewImageUrl, missionId, targetUrl]);
 
-  // Stage-synced terminal logs
-  useEffect(() => {
-    if (!active) return;
-    const stageLogs = STAGE_LOGS[currentStage];
-    const logIndex = Math.min(
-      Math.floor((stageProgress / 100) * stageLogs.length),
-      stageLogs.length - 1
-    );
-    const line = stageLogs[logIndex];
-    setLogs((prev) => {
-      if (prev[prev.length - 1] === line) return prev;
-      return [...prev.slice(-5), line];
-    });
-  }, [active, currentStage, stageProgress]);
-
-  // Cycling analysis bounding boxes
-  useEffect(() => {
-    if (!active || phase !== "live") return;
-    const interval = setInterval(() => {
-      setStepIndex((prev) => (prev + 1) % ANALYSIS_STEPS.length);
-    }, 2200);
-    return () => clearInterval(interval);
-  }, [active, phase]);
-
-  // Element counter
-  useEffect(() => {
-    if (!active || phase !== "live") return;
-    const interval = setInterval(() => {
-      setElementsScanned((n) => n + Math.floor(Math.random() * 12 + 3));
-    }, 800);
-    return () => clearInterval(interval);
-  }, [active, phase]);
-
-  const latestLog = logs[logs.length - 1] ?? "";
-  const typedLog = useTypewriter(latestLog);
+  const terminalLines = (() => {
+    const lines = mission?.progressLog?.slice(-6).map((l) => l.message) ?? [];
+    if (lines.length > 0) return lines;
+    return [`${copy.mission.missionProgress}: ${currentStage} (${stageProgress}%)`];
+  })();
 
   if (!active) return null;
 
-  const currentStep = ANALYSIS_STEPS[stepIndex];
-  const isLive = phase === "live";
-  const showPreview = isLive || phase === "fallback";
-
-  const phaseLabel: Record<LoadPhase, string> = {
-    connecting: copy.scan.phases.connecting,
-    fetching: copy.scan.phases.fetching,
-    rendering: copy.scan.phases.rendering,
-    live: copy.scan.phases.live,
-    fallback: copy.scan.phases.fallback,
-  };
+  const showPreview = !!screenshotUrl;
 
   return (
     <div className="relative overflow-hidden rounded-2xl border border-violet/20 bg-navy/60 shadow-[0_0_40px_rgba(139,92,246,0.08)]">
@@ -219,65 +107,23 @@ export function ScanAnimation({
 
       {/* Viewport */}
       <div className="relative aspect-[16/10] overflow-hidden bg-midnight">
-        {/* Real crawled screenshot with a slow scroll simulation */}
-        <div className="absolute inset-0 overflow-hidden">
-          <motion.div
-            className="absolute inset-x-0 top-0"
-            animate={showPreview ? { y: [0, -80, -200, -120, 0] } : { y: 0 }}
-            transition={{ duration: 18, repeat: Infinity, ease: "easeInOut" }}
-          >
-            {screenshotUrl && (
-              <motion.img
-                src={screenshotUrl}
-                alt={copy.scan.previewAlt(domain)}
-                initial={{ opacity: 0, scale: 1.04 }}
-                animate={{ opacity: 0.92, scale: 1 }}
-                transition={{ duration: 1.2 }}
-                className="pointer-events-none w-full select-none object-cover object-top"
-              />
-            )}
-          </motion.div>
-        </div>
-
-        {/* Loading overlay */}
-        <AnimatePresence>
-          {!isLive && phase !== "fallback" && (
-            <motion.div
-              initial={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              transition={{ duration: 0.8 }}
-              className="absolute inset-0 z-20 flex flex-col items-center justify-center bg-midnight/95"
-            >
-              <div className="mb-6 h-10 w-10 animate-spin rounded-full border-2 border-violet/20 border-t-violet" />
-              <p className="font-mono text-sm text-ghost-white/80">
-                {phaseLabel[phase]}
-              </p>
-              <p className="mt-1 font-mono text-xs text-muted">{domain}</p>
-              <div className="mt-6 h-1 w-48 overflow-hidden rounded-full bg-navy-light">
-                <motion.div
-                  className="h-full rounded-full bg-gradient-to-r from-violet to-ai-blue"
-                  animate={{ width: `${loadProgress}%` }}
-                  transition={{ duration: 0.3 }}
-                />
-              </div>
-              <p className="mt-2 font-mono text-[10px] text-violet/70">
-                {loadProgress}%
-              </p>
-            </motion.div>
-          )}
-        </AnimatePresence>
-
-        {/* Fallback wireframe when no screenshot is available */}
-        {phase === "fallback" && !screenshotUrl && (
-          <div className="absolute inset-0 z-10 flex flex-col p-8 opacity-30">
-            <div className="mb-4 h-6 w-2/3 rounded bg-violet/20" />
-            <div className="mb-2 h-4 w-1/2 rounded bg-ghost-white/10" />
-            <div className="mb-6 h-3 w-1/3 rounded bg-ghost-white/5" />
-            <div className="grid flex-1 grid-cols-3 gap-4">
-              {[0, 1, 2].map((i) => (
-                <div key={i} className="rounded-lg bg-ai-blue/10" />
-              ))}
-            </div>
+        {/* Real crawled screenshot (only when available) */}
+        {screenshotUrl ? (
+          <motion.img
+            src={screenshotUrl}
+            alt={copy.scan.previewAlt(domain)}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 0.92 }}
+            transition={{ duration: 0.4 }}
+            className="absolute inset-0 pointer-events-none w-full select-none object-cover object-top"
+          />
+        ) : (
+          <div className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-3 bg-midnight/95 p-8 text-center">
+            <div className="h-10 w-10 animate-spin rounded-full border-2 border-violet/20 border-t-violet" />
+            <p className="font-mono text-sm text-ghost-white/80">
+              Waiting for homepage snapshot…
+            </p>
+            <p className="font-mono text-xs text-muted">{domain}</p>
           </div>
         )}
 
@@ -291,66 +137,7 @@ export function ScanAnimation({
           }}
         />
 
-        {/* AI bounding box */}
-        {showPreview && (
-          <AnimatePresence mode="wait">
-            <motion.div
-              key={stepIndex}
-              initial={{ opacity: 0, scale: 0.92 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.95 }}
-              transition={{ duration: 0.35 }}
-              style={{
-                position: "absolute",
-                top: currentStep.top,
-                left: currentStep.left,
-                width: currentStep.w,
-                height: currentStep.h,
-              }}
-              className="pointer-events-none z-30 select-none rounded border-2 border-violet/70 bg-violet/[0.06] shadow-[0_0_24px_rgba(139,92,246,0.25)]"
-            >
-              {/* Corner brackets */}
-              {(["tl", "tr", "bl", "br"] as const).map((corner) => (
-                <span
-                  key={corner}
-                  className={`absolute h-3 w-3 border-violet ${
-                    corner === "tl"
-                      ? "-left-px -top-px border-l-2 border-t-2"
-                      : corner === "tr"
-                        ? "-right-px -top-px border-r-2 border-t-2"
-                        : corner === "bl"
-                          ? "-bottom-px -left-px border-b-2 border-l-2"
-                          : "-bottom-px -right-px border-b-2 border-r-2"
-                  }`}
-                />
-              ))}
-              <div className="absolute -top-7 left-0 flex items-center gap-1.5 whitespace-nowrap rounded bg-midnight/90 px-2 py-0.5 font-mono text-[9px] text-violet-glow backdrop-blur-sm">
-                <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-violet" />
-                {currentStep.label}
-              </div>
-              <div className="absolute -bottom-5 left-0 font-mono text-[8px] text-ghost-white/60">
-                {currentStep.desc}
-              </div>
-            </motion.div>
-          </AnimatePresence>
-        )}
-
-        {/* Horizontal scan line */}
-        {showPreview && (
-          <motion.div
-            animate={{ top: ["0%", "100%"] }}
-            transition={{ duration: 2.8, repeat: Infinity, ease: "linear" }}
-            className="pointer-events-none absolute right-0 left-0 z-25 h-[2px] bg-gradient-to-r from-transparent via-ai-blue to-transparent shadow-[0_0_16px_rgba(96,165,250,0.6)]"
-          />
-        )}
-
-        {/* Stats HUD */}
-        {showPreview && (
-          <div className="pointer-events-none absolute right-3 top-3 z-30 rounded-lg border border-border/50 bg-midnight/80 px-3 py-2 font-mono text-[9px] backdrop-blur-sm">
-            <p className="text-muted">{copy.scan.elementsScanned}</p>
-            <p className="text-ai-blue">{elementsScanned.toLocaleString()}</p>
-          </div>
-        )}
+        {/* NOTE: Removed bounding boxes, fake scan line, and random counters to keep UI strictly real-work-driven. */}
 
         {/* Vignette */}
         <div className="pointer-events-none absolute inset-0 z-20 bg-[radial-gradient(ellipse_at_center,transparent_50%,rgba(3,3,8,0.4)_100%)]" />
@@ -365,7 +152,7 @@ export function ScanAnimation({
           <span className="h-1 w-1 animate-pulse rounded-full bg-neon-green" />
         </div>
         <div className="min-h-[72px] space-y-1 font-mono text-[10px] sm:text-xs">
-          {logs.slice(0, -1).map((line, i) => (
+          {terminalLines.slice(0, -1).map((line, i) => (
             <p key={`${i}-${line}`} className="flex items-center gap-2 text-muted/60">
               <span className="text-neon-green/40">{copy.scan.terminalPrompt}</span>
               {line}
@@ -374,7 +161,7 @@ export function ScanAnimation({
           <p className="flex items-center gap-2 text-ai-blue">
             <span className="text-neon-green/70">{copy.scan.terminalPrompt}</span>
             <span>
-              {typedLog}
+              {terminalLines[terminalLines.length - 1] ?? ""}
               <motion.span
                 animate={{ opacity: [1, 0] }}
                 transition={{ duration: 0.6, repeat: Infinity }}

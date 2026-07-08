@@ -68,11 +68,53 @@ export interface AIFix {
   icon: string;
 }
 
+export type GhostScoreBand =
+  | "Excellent"
+  | "Strong"
+  | "Good"
+  | "NeedsImprovement"
+  | "Weak"
+  | "Critical";
+
+export type GhostScoreDimensionId =
+  | "customer_journey"
+  | "trust"
+  | "conversion"
+  | "ux"
+  | "information"
+  | "technical";
+
+export interface GhostScoreCheck {
+  id: string;
+  label: string;
+  points: number;
+  passed: boolean;
+  evidence?: string;
+}
+
+export interface GhostScoreDimension {
+  id: GhostScoreDimensionId;
+  label: string;
+  weight: number;
+  value: number;
+  contribution: number;
+  checks: GhostScoreCheck[];
+}
+
+export interface GhostScoreBreakdown {
+  version: "2";
+  value: number;
+  band: GhostScoreBand;
+  dimensions: GhostScoreDimension[];
+}
+
 export interface GhostReport {
   id: string;
   url: string;
   domain: string;
   score: number;
+  scoreVersion?: "1" | "2";
+  scoreBreakdown?: GhostScoreBreakdown;
   scannedAt: string;
   businessUnderstanding: BusinessUnderstanding;
   journey: JourneyStep[];
@@ -93,6 +135,25 @@ export interface MissionState {
   stageProgress: number;
   personas: ShopperPersona[];
   startedAt: string;
+  /** Real crawl preview (data URI) once captured. */
+  previewImageUrl?: string;
+  /** Real-time, append-only mission log lines (no fake timers). */
+  progressLog?: Array<{ ts: string; stage: MissionStage; message: string }>;
+  /** Customer flows detected in Stage 1.5. */
+  detectedFlows?: Array<{
+    id: string;
+    name: string;
+    goal: string;
+    revenue_weight: number;
+  }>;
+  /** Real snippets from completed shopper journeys as they land. */
+  customerSnippets?: Array<{
+    flowId: string;
+    flowName: string;
+    outcome: "completed" | "hesitant" | "abandoned";
+    droppedAt: string;
+    steps: Array<{ page: string; action: string; observation: string }>;
+  }>;
   /** Human-readable reason, set when status is "error". */
   error?: string;
 }

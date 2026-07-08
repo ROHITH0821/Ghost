@@ -2,7 +2,12 @@ import { analyzeFlows } from "./flows";
 import { buildFlowRuns, runSwarm, type FlowRun } from "./swarm";
 import { aggregate } from "./aggregate";
 import { generateFixes } from "./fixes";
-import { computeGhostScore, type GhostScore } from "./scoring";
+import {
+  computeGhostScoreV2FromParts,
+  defaultCrawlSignals,
+  type GhostScore,
+  type CrawlSignals,
+} from "./scoring";
 import { MAX_FIXES } from "./config";
 import {
   ContextPackSchema,
@@ -49,6 +54,8 @@ export interface AuditOptions {
   withFixes?: boolean;
   /** How many top leaks to fix. Defaults to config MAX_FIXES. */
   maxFixes?: number;
+  /** Lightweight deterministic crawl signals for Technical scoring. */
+  crawlSignals?: CrawlSignals;
 }
 
 export interface AuditResult {
@@ -64,7 +71,7 @@ export async function runAudit(
   events: AuditEvents = {},
   options: AuditOptions = {},
 ): Promise<AuditResult> {
-  const { withFixes = true, maxFixes = MAX_FIXES } = options;
+  const { withFixes = true, maxFixes = MAX_FIXES, crawlSignals } = options;
 
   // Fail loudly on a malformed pack (important once a real crawler feeds this).
   const pack = ContextPackSchema.parse(contextPack);
@@ -88,7 +95,12 @@ export async function runAudit(
   // Stage 3 — cluster into leaks, weighted by flow revenue.
   events.onAggregateStart?.(journeys);
   const report = await aggregate(pack, flows, journeys);
-  const score = computeGhostScore(report);
+  const score = computeGhostScoreV2FromParts({
+    contextPack: pack,
+    flows,
+    journeys,
+    crawlSignals: crawlSignals ?? defaultCrawlSignals(),
+  });
   events.onReport?.(report, score);
 
   // Stage 4 — turn the worst leaks into ready-to-paste fixes.

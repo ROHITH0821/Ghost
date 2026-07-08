@@ -28,7 +28,7 @@ import {
   persistMissionProgress,
   persistMissionReport,
 } from "../db/missions";
-import { assessCrawl, ingestUrl } from "../ghost-engine/ingest";
+import { assessCrawl, buildCrawlSignals, ingestUrl } from "../ghost-engine/ingest";
 import { runAudit } from "../ghost-engine/pipeline";
 import { toGhostReport } from "../ghost-engine/adapter";
 
@@ -37,6 +37,22 @@ const reportStore = new Map<string, GhostReport>();
 /** missionId → homepage screenshot (data URI) captured during the crawl. */
 const previewStore = new Map<string, string>();
 const persistTimers = new Map<string, ReturnType<typeof setTimeout>>();
+
+function nowIso(): string {
+  return new Date().toISOString();
+}
+
+function appendProgressLog(missionId: string, message: string, stage?: MissionStage): void {
+  const mission = missionStore.get(missionId);
+  if (!mission) return;
+  const entry = { ts: nowIso(), stage: stage ?? mission.currentStage, message };
+  const next = [...(mission.progressLog ?? []), entry].slice(-50);
+  patchMission(missionId, { progressLog: next });
+}
+
+function setPreviewImage(missionId: string, dataUri: string): void {
+  patchMission(missionId, { previewImageUrl: dataUri });
+}
 
 export async function startGhostMission(
   request: AnalyzeRequest & { missionId?: string }
@@ -154,31 +170,77 @@ async function runRealAudit(
   try {
     // Stage 1 → 1.4: crawl + synthesize the Context Pack.
     setStage(missionId, "understanding", 15);
+    appendProgressLog(missionId, "Starting crawl…", "understanding");
     let lowConfidence = false;
+    let crawlSignals = buildCrawlSignals({
+      rootUrl: url,
+      pages: [],
+      discoveredFrom: { sitemap: 0, links: 0 },
+      truncated: false,
+    });
     const pack = await ingestUrl(url, {
       onCrawled: (crawl) => {
         // Surface the real homepage screenshot so the scan shows the actual site.
         const shot = crawl.pages.find((p) => p.screenshotB64)?.screenshotB64;
-        if (shot) previewStore.set(missionId, `data:image/png;base64,${shot}`);
+        if (shot) {
+          const dataUri = `data:image/png;base64,${shot}`;
+          previewStore.set(missionId, dataUri);
+          setPreviewImage(missionId, dataUri);
+          appendProgressLog(missionId, "Captured homepage snapshot.", "understanding");
+        }
+        appendProgressLog(
+          missionId,
+          `Crawled ${crawl.pages.length} page(s) (${crawl.discoveredFrom.sitemap} from sitemap, ${crawl.discoveredFrom.links} from links).`,
+          "understanding",
+        );
         lowConfidence = assessCrawl(crawl).lowConfidence;
+        crawlSignals = buildCrawlSignals(crawl);
         setStage(missionId, "understanding", 100);
       },
     });
 
     // Stages 1.5 → 4: flows, swarm, report, fixes.
     const result = await runAudit(pack, {
-      onFlows: () => setStage(missionId, "personas", 100),
-      onCustomer: (_journey, _run, progress) => {
+      onFlows: (flows) => {
+        setStage(missionId, "personas", 100);
+        patchMission(missionId, {
+          detectedFlows: flows.map((f) => ({
+            id: f.id,
+            name: f.name,
+            goal: f.goal,
+            revenue_weight: f.revenue_weight,
+          })),
+        });
+        appendProgressLog(missionId, `Detected ${flows.length} customer flow(s).`, "personas");
+      },
+      onCustomer: (journey, run, progress) => {
         const pct = (progress.done / progress.total) * 100;
         setStage(missionId, "testing", pct);
         advancePersonas(missionId, pct);
+        patchMission(missionId, {
+          customerSnippets: [
+            ...(missionStore.get(missionId)?.customerSnippets ?? []),
+            {
+              flowId: run.flow.id,
+              flowName: run.flow.name,
+              outcome: journey.outcome,
+              droppedAt: journey.dropped_at,
+              steps: journey.journey.slice(0, 4),
+            },
+          ].slice(-12),
+        });
+        appendProgressLog(
+          missionId,
+          `${run.flow.name}: ${journey.outcome}${journey.outcome !== "completed" ? ` (dropped at ${journey.dropped_at})` : ""}`,
+          "testing",
+        );
       },
       onAggregateStart: () => setStage(missionId, "leaks", 40),
       onReport: () => setStage(missionId, "leaks", 100),
       onFixesStart: () => setStage(missionId, "generating", 20),
       onFix: (_fix, progress) =>
         setStage(missionId, "generating", (progress.done / progress.total) * 100),
-    });
+    }, { crawlSignals });
 
     const report = toGhostReport(missionId, url, domain, pack, result, { lowConfidence });
     reportStore.set(missionId, report);

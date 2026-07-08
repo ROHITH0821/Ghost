@@ -464,10 +464,10 @@ export const copy = {
     scanAnotherAccent: "site?",
     ghostScore: "Ghost Score",
     scoreLabels: {
-      excellent: "Customers stick around",
-      needsWork: "Shoppers are ghosting",
-      critical: "Major ghost spots",
-      urgent: "Customers are leaving fast",
+      excellent: "Excellent customer experience",
+      needsWork: "Healthy, but leaking",
+      critical: "Conversion leaks detected",
+      urgent: "Customers are ghosting",
     },
     businessUnderstanding: {
       label: "Business understanding",
@@ -832,9 +832,9 @@ export function getMissionStages() {
 
 /** Ghost Score label from numeric score */
 export function getScoreLabel(score: number): string {
-  if (score >= 80) return copy.results.scoreLabels.excellent;
-  if (score >= 60) return copy.results.scoreLabels.needsWork;
-  if (score >= 40) return copy.results.scoreLabels.critical;
+  if (score >= 95) return copy.results.scoreLabels.excellent;
+  if (score >= 70) return copy.results.scoreLabels.needsWork;
+  if (score >= 55) return copy.results.scoreLabels.critical;
   return copy.results.scoreLabels.urgent;
 }
 

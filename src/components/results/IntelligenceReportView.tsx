@@ -11,6 +11,7 @@ import { BusinessUnderstandingCard } from "@/components/results/BusinessUndersta
 import { JourneyMap } from "@/components/results/JourneyMap";
 import { LeakCards } from "@/components/results/LeakCards";
 import { FixCenter } from "@/components/results/FixCenter";
+import { ScoreBreakdown } from "@/components/results/ScoreBreakdown";
 import { copy } from "@/lib/copy";
 import { EASE_SMOOTH } from "@/lib/motion";
 
@@ -178,7 +179,12 @@ export function IntelligenceReportView({
 
       {!hideScore && (
         <ScrollReveal className={`flex justify-center ${compact ? "my-10 md:my-12" : "my-16 md:my-20"}`}>
-          <GhostScore score={report.score} />
+          <div className="w-full max-w-5xl">
+            <div className="flex justify-center">
+              <GhostScore score={report.score} />
+            </div>
+            {report.scoreBreakdown ? <ScoreBreakdown breakdown={report.scoreBreakdown} /> : null}
+          </div>
         </ScrollReveal>
       )}
 

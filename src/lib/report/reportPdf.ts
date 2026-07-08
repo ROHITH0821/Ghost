@@ -21,16 +21,20 @@ const SEVERITY_COLOR: Record<Severity, string> = {
 };
 
 function scoreColor(score: number): string {
-  if (score >= 80) return "#22c55e";
-  if (score >= 60) return "#38bdf8";
-  if (score >= 40) return "#f59e0b";
+  if (score >= 95) return "#22c55e";
+  if (score >= 85) return "#38bdf8";
+  if (score >= 70) return "#a78bfa";
+  if (score >= 55) return "#f59e0b";
+  if (score >= 40) return "#f97316";
   return "#ef4444";
 }
 
 function scoreLabel(score: number): string {
-  if (score >= 80) return "Healthy";
-  if (score >= 60) return "Fair";
-  if (score >= 40) return "Leaky";
+  if (score >= 95) return "Excellent";
+  if (score >= 85) return "Strong";
+  if (score >= 70) return "Good";
+  if (score >= 55) return "Needs Improvement";
+  if (score >= 40) return "Weak";
   return "Critical";
 }
 
@@ -110,6 +114,19 @@ export function buildReportHtml(report: GhostReport, logo: string | null): strin
     )
     .join("");
 
+  const breakdownRows = report.scoreBreakdown
+    ? report.scoreBreakdown.dimensions
+        .map(
+          (d) => `
+      <tr>
+        <td class="bd-name">${esc(d.label)}</td>
+        <td class="bd-w">${Math.round(d.weight * 100)}%</td>
+        <td class="bd-v">${d.value}</td>
+      </tr>`,
+        )
+        .join("")
+    : "";
+
   return `<!doctype html><html><head><meta charset="utf-8"><style>
     * { box-sizing: border-box; }
     body { font-family: Georgia, "Times New Roman", serif; color: #1a1a1a; margin: 0; padding: 30px 34px; font-size: 11px; line-height: 1.45; }
@@ -127,6 +144,14 @@ export function buildReportHtml(report: GhostReport, logo: string | null): strin
     .hero-txt .goal { font-size: 12.5px; color: #333; }
     .note { background: #fff8e6; border: 1px solid #f0d98a; border-radius: 6px; padding: 9px 12px; margin: 14px 0 0; font-size: 10px; color: #6b5a1a; }
     .section-title { font-size: 12px; text-transform: uppercase; letter-spacing: 1.5px; color: #666; margin: 20px 0 8px; border-bottom: 1px solid #ddd; padding-bottom: 3px; }
+    .breakdown { border: 1px solid #eee; border-radius: 6px; padding: 10px 12px; margin-top: 12px; }
+    .bd-title { font-size: 10px; text-transform: uppercase; letter-spacing: 1.2px; color: #666; margin-bottom: 6px; }
+    table { width: 100%; border-collapse: collapse; }
+    .bd th, .bd td { font-size: 10px; padding: 5px 6px; border-bottom: 1px solid #f0f0f0; text-align: left; }
+    .bd th { color: #888; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; font-size: 9px; }
+    .bd-name { width: 60%; }
+    .bd-w { width: 15%; color: #666; }
+    .bd-v { width: 25%; text-align: right; font-weight: 700; }
     .bu { display: grid; grid-template-columns: 1fr 1fr; gap: 8px 20px; }
     .bu .lbl { font-size: 9.5px; text-transform: uppercase; letter-spacing: 1px; color: #888; }
     .bu p { margin: 1px 0 6px; }
@@ -165,6 +190,17 @@ export function buildReportHtml(report: GhostReport, logo: string | null): strin
         <div class="goal" style="margin-top:4px;color:#666;font-size:10.5px;">
           ${esc(report.url)} · ${esc(date)} ${esc(time)}
         </div>
+        ${
+          report.scoreBreakdown
+            ? `<div class="breakdown">
+                 <div class="bd-title">Score breakdown</div>
+                 <table class="bd">
+                   <thead><tr><th class="bd-name">Dimension</th><th class="bd-w">Weight</th><th class="bd-v">Score</th></tr></thead>
+                   <tbody>${breakdownRows}</tbody>
+                 </table>
+               </div>`
+            : ""
+        }
       </div>
     </div>
 

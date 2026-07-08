@@ -39,6 +39,13 @@ export function MissionPageClient({ missionId }: MissionPageClientProps) {
 
     const poll = async () => {
       try {
+        // If the report is already available (fast audits, warmed caches), stop immediately.
+        const gotEarly = await fetchReport();
+        if (gotEarly) {
+          clearInterval(interval);
+          return;
+        }
+
         const res = await fetch(`/api/analyze?missionId=${missionId}`);
         if (res.status === 401) {
           clearInterval(interval);

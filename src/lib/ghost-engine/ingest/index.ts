@@ -1,6 +1,7 @@
 import { crawlSite, type CrawlOptions, type RawCrawl } from "./crawl";
 import { buildContextPack } from "./buildContextPack";
 import type { ContextPack } from "../types";
+import type { CrawlSignals } from "../scoring";
 
 export type { RawCrawl } from "./crawl";
 export type { RawPage } from "./extract";
@@ -18,6 +19,23 @@ export function assessCrawl(crawl: RawCrawl): { lowConfidence: boolean } {
     (p) => p.text.replace(/\s+/g, " ").trim().length > 800,
   ).length;
   return { lowConfidence: crawl.pages.length > 0 && richPages === 0 };
+}
+
+export function buildCrawlSignals(crawl: RawCrawl): CrawlSignals {
+  const richPageCount = crawl.pages.filter(
+    (p) => p.text.replace(/\s+/g, " ").trim().length > 800,
+  ).length;
+  const screenshotCount = crawl.pages.filter((p) => !!p.screenshotB64).length;
+  const dynamicRenderCount = crawl.pages.filter((p) => p.renderedWith === "dynamic").length;
+  const { lowConfidence } = assessCrawl(crawl);
+
+  return {
+    pageCount: crawl.pages.length,
+    richPageCount,
+    screenshotCount,
+    dynamicRenderCount,
+    lowConfidence,
+  };
 }
 
 export interface IngestEvents {

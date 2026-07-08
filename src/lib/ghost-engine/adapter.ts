@@ -143,6 +143,8 @@ export function toGhostReport(
     url,
     domain,
     score: result.score.value,
+    scoreVersion: result.score.version ?? "2",
+    scoreBreakdown: result.score,
     scannedAt: new Date().toISOString(),
     businessUnderstanding: businessUnderstanding(pack, result),
     journey: journey(result),

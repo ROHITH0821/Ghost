@@ -15,9 +15,10 @@ import type { AuditResult } from "../pipeline";
 
 const BAND_COLOR: Record<GhostScore["band"], string> = {
   Critical: "#e5484d",
-  Poor: "#e5484d",
-  Fair: "#f5a623",
-  Good: "#30a46c",
+  Weak: "#f97316",
+  NeedsImprovement: "#f5a623",
+  Good: "#a78bfa",
+  Strong: "#38bdf8",
   Excellent: "#30a46c",
 };
 

@@ -26,6 +26,7 @@ export function MissionDashboard({ mission, report }: MissionDashboardProps) {
   const isError = mission.status === "error";
   const isComplete = mission.status === "complete";
   const showPersonas =
+    !report &&
     !isComplete &&
     !isError &&
     (mission.currentStage === "deploying" ||
@@ -33,7 +34,7 @@ export function MissionDashboard({ mission, report }: MissionDashboardProps) {
       mission.currentStage === "leaks" ||
       mission.currentStage === "generating");
 
-  const showScan = mission.status === "running";
+  const showScan = mission.status === "running" && !report;
 
   const handleRetry = async () => {
     setRetrying(true);
@@ -203,6 +204,7 @@ export function MissionDashboard({ mission, report }: MissionDashboardProps) {
                       active={showScan}
                       currentStage={mission.currentStage}
                       stageProgress={mission.stageProgress}
+                      mission={mission}
                     />
                   </motion.div>
                 )}
@@ -234,7 +236,7 @@ export function MissionDashboard({ mission, report }: MissionDashboardProps) {
                 )}
               </AnimatePresence>
 
-              <PersonaCards personas={mission.personas} show={showPersonas} />
+              <PersonaCards personas={mission.personas} mission={mission} show={showPersonas} />
             </div>
           </div>
           )}
