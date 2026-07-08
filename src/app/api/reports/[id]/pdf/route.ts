@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getReport } from "@/lib/api/ghost-api";
 import { getSession } from "@/lib/auth";
 import { copy } from "@/lib/copy";
+import { getMissionPdfUrlFromDb } from "@/lib/db/missions";
 import { generateGhostReportPdf } from "@/lib/report/reportPdf";
 
 // PDF generation uses Playwright — force the Node.js runtime.
@@ -18,6 +19,11 @@ export async function GET(
   }
 
   const { id } = await params;
+  const storedPdfUrl = await getMissionPdfUrlFromDb(id);
+  if (storedPdfUrl) {
+    return NextResponse.redirect(storedPdfUrl, 302);
+  }
+
   const report = await getReport(id);
   if (!report) {
     return NextResponse.json({ error: copy.authApi.reportNotFound }, { status: 404 });

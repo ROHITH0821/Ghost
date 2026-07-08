@@ -391,13 +391,7 @@ function MissionRow({ mission, compact }: { mission: RecentMissionRow; compact: 
       </div>
 
       <div className="flex shrink-0 flex-wrap gap-3">
-        <Link
-          href={`/mission/${mission.id}`}
-          className="rounded-xl border border-border bg-surface/40 px-4 py-2 text-sm text-ghost-white/80 transition-colors hover:text-ghost-white"
-        >
-          Open
-        </Link>
-        {mission.status === "complete" && (
+        {mission.status === "complete" && mission.pdfUrl ? (
           <Link
             href={`/api/reports/${mission.id}/pdf`}
             download
@@ -405,7 +399,16 @@ function MissionRow({ mission, compact }: { mission: RecentMissionRow; compact: 
           >
             PDF
           </Link>
-        )}
+        ) : mission.status === "complete" ? (
+          <button
+            type="button"
+            disabled
+            className="cursor-not-allowed rounded-xl bg-violet/40 px-4 py-2 text-sm font-medium text-white/70"
+            title="PDF download is coming soon"
+          >
+            PDF (coming soon)
+          </button>
+        ) : null}
       </div>
     </div>
   );

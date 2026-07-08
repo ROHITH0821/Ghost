@@ -11,6 +11,16 @@ import {
   type PersonaJourney,
 } from "./types";
 
+function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const timeout = new Promise<never>((_, reject) => {
+    timer = setTimeout(() => reject(new Error(`${label} timed out after ${ms}ms`)), ms);
+  });
+  return Promise.race([promise, timeout]).finally(() => {
+    if (timer) clearTimeout(timer);
+  });
+}
+
 /**
  * Stage 2 — the persona swarm, flow-driven and concurrency-bounded.
  *
@@ -97,25 +107,29 @@ ${archetype.identity}
 THE CUSTOMER FLOW YOU ARE EXERCISING: ${flow.name}
 YOUR GOAL FOR THIS VISIT: ${flow.goal}`;
 
-  const response = await anthropic().messages.parse({
-    model: MODEL,
-    max_tokens: MAX_TOKENS_PERSONA,
-    system: [
-      // Stable across all shoppers → cached prefix (~0.1x on reads).
-      { type: "text", text: cachedPrefix, cache_control: { type: "ephemeral" } },
-      // Varies per shopper → full price, but small.
-      { type: "text", text: personaBlock },
-    ],
-    messages: [
-      {
-        role: "user",
-        content: `Walk this business's online presence as yourself, chasing your goal.
+  const response = await withTimeout(
+    anthropic().messages.parse({
+      model: MODEL,
+      max_tokens: MAX_TOKENS_PERSONA,
+      system: [
+        // Stable across all shoppers → cached prefix (~0.1x on reads).
+        { type: "text", text: cachedPrefix, cache_control: { type: "ephemeral" } },
+        // Varies per shopper → full price, but small.
+        { type: "text", text: personaBlock },
+      ],
+      messages: [
+        {
+          role: "user",
+          content: `Walk this business's online presence as yourself, chasing your goal.
 Then report your journey, where (if anywhere) you dropped off, and your verbatim
 complaint. Set "persona" to "${archetype.id}" and "flow_id" to "${flow.id}".`,
-      },
-    ],
-    output_config: { format: zodOutputFormat(PersonaJourneySchema) },
-  });
+        },
+      ],
+      output_config: { format: zodOutputFormat(PersonaJourneySchema) },
+    }),
+    90_000,
+    `Persona run for flow ${flow.id}`,
+  );
 
   const journey = response.parsed_output;
   if (!journey) {

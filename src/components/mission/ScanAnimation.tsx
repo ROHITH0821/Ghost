@@ -79,6 +79,7 @@ export function ScanAnimation({
   if (!active) return null;
 
   const showPreview = !!screenshotUrl;
+  const isLive = showPreview && stageProgress >= 15;
 
   return (
     <div className="relative overflow-hidden rounded-2xl border border-violet/20 bg-navy/60 shadow-[0_0_40px_rgba(139,92,246,0.08)]">

@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from "next/server";
-import { after } from "next/server";
 import { getMissionStatus, runGhostAudit, startGhostMission } from "@/lib/api/ghost-api";
 import { getSession } from "@/lib/auth";
 import { copy } from "@/lib/copy";
@@ -49,8 +48,10 @@ export async function POST(request: NextRequest) {
 
     const result = await startGhostMission({ url: trimmedUrl, missionId });
 
-    after(async () => {
-      await runGhostAudit(missionId, trimmedUrl, domain);
+    // Kick off the audit without blocking the response.
+    // `after()` can be unreliable in dev / some runtimes; a detached promise is simpler.
+    void runGhostAudit(missionId, trimmedUrl, domain).catch((error) => {
+      console.error("[analyze] background audit failed:", error);
     });
 
     return NextResponse.json(result);

@@ -26,11 +26,14 @@ import {
   getMissionStatusFromDb,
   persistMissionError,
   persistMissionProgress,
+  persistMissionPdf,
   persistMissionReport,
 } from "../db/missions";
 import { assessCrawl, buildCrawlSignals, ingestUrl } from "../ghost-engine/ingest";
 import { runAudit } from "../ghost-engine/pipeline";
 import { toGhostReport } from "../ghost-engine/adapter";
+import { generateGhostReportPdf } from "../report/reportPdf";
+import { uploadMissionPdf } from "../storage/supabase";
 
 const missionStore = new Map<string, MissionState>();
 const reportStore = new Map<string, GhostReport>();
@@ -255,6 +258,14 @@ async function runRealAudit(
       await persistMissionReport(missionId, report);
     } catch (dbError) {
       console.error("[ghost-audit] mission report persist failed:", dbError);
+    }
+
+    try {
+      const pdf = await generateGhostReportPdf(report);
+      const uploaded = await uploadMissionPdf({ missionId, domain: report.domain, pdfBytes: pdf });
+      await persistMissionPdf(missionId, { pdfUrl: uploaded.publicUrl });
+    } catch (pdfError) {
+      console.error("[ghost-audit] mission pdf upload failed:", pdfError);
     }
   } catch (error) {
     console.error("[ghost-audit]", error);

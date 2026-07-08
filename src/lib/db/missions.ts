@@ -138,6 +138,29 @@ export async function getMissionReportFromDb(
   return mission.report as unknown as GhostReport;
 }
 
+export async function persistMissionPdf(
+  missionId: string,
+  input: { pdfUrl: string }
+): Promise<void> {
+  await db.mission.update({
+    where: { id: missionId },
+    data: {
+      pdfUrl: input.pdfUrl,
+      pdfUploadedAt: new Date(),
+    },
+  });
+}
+
+export async function getMissionPdfUrlFromDb(missionId: string): Promise<string | null> {
+  const mission = await db.mission.findUnique({
+    where: { id: missionId },
+    select: { pdfUrl: true, status: true },
+  });
+
+  if (!mission?.pdfUrl || mission.status !== "complete") return null;
+  return mission.pdfUrl;
+}
+
 export async function getMissionStatusFromDb(
   missionId: string
 ): Promise<MissionState | null> {
@@ -190,6 +213,7 @@ export type RecentMissionRow = {
   status: string;
   createdAt: Date;
   updatedAt: Date;
+  pdfUrl?: string | null;
   progress?: {
     currentStage?: MissionState["currentStage"];
     stageProgress?: number;
@@ -211,6 +235,7 @@ export async function getRecentMissionsForUser(input: {
       domain: true,
       status: true,
       progress: true,
+      pdfUrl: true,
       createdAt: true,
       updatedAt: true,
     },
