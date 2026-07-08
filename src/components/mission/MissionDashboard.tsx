@@ -1,0 +1,190 @@
+"use client";
+
+import { motion, AnimatePresence } from "framer-motion";
+import { CheckCircle2, Radio } from "lucide-react";
+import type { GhostReport, MissionState } from "@/lib/types";
+import { StageList } from "./StageList";
+import { PersonaCards } from "./PersonaCards";
+import { ScanAnimation } from "./ScanAnimation";
+import { GhostLogo } from "@/components/ui/GhostLogo";
+import { IntelligenceReportView } from "@/components/results/IntelligenceReportView";
+import { GhostScore } from "@/components/results/GhostScore";
+import { copy } from "@/lib/copy";
+import { EASE_SMOOTH } from "@/lib/motion";
+
+interface MissionDashboardProps {
+  mission: MissionState;
+  report?: GhostReport | null;
+}
+
+export function MissionDashboard({ mission, report }: MissionDashboardProps) {
+  const isComplete = mission.status === "complete";
+  const showPersonas =
+    !isComplete &&
+    (mission.currentStage === "deploying" ||
+      mission.currentStage === "testing" ||
+      mission.currentStage === "leaks" ||
+      mission.currentStage === "generating");
+
+  const showScan = mission.status === "running";
+
+  return (
+    <div className="relative min-h-screen">
+      <div className="pointer-events-none fixed inset-0 z-0">
+        <div className="absolute top-0 left-1/2 h-[50vh] w-[70vw] -translate-x-1/2 rounded-full bg-violet/[0.05] blur-[100px]" />
+      </div>
+
+      <div className="relative z-10">
+        <header className="section-pad border-b border-border">
+          <div className="mx-auto flex h-20 max-w-[1400px] items-center justify-between">
+            <GhostLogo size="sm" />
+            <div className="flex items-center gap-4">
+              {isComplete ? (
+                <span className="hidden items-center gap-2 text-xs text-neon-green sm:flex">
+                  <CheckCircle2 className="h-3.5 w-3.5" />
+                  {copy.mission.reportReady}
+                </span>
+              ) : (
+                <span className="hidden items-center gap-2 text-xs text-muted sm:flex">
+                  <Radio className="h-3 w-3 animate-pulse text-neon-green" />
+                  {copy.mission.missionActive}
+                </span>
+              )}
+              <span className="text-xs text-muted">{mission.domain}</span>
+            </div>
+          </div>
+        </header>
+
+        <div className="section-pad mx-auto max-w-[1400px] py-10 md:py-14">
+          <motion.div
+            initial={{ opacity: 0, y: 30 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="mb-12 md:mb-16"
+          >
+            <AnimatePresence mode="wait">
+              {isComplete && report ? (
+                <motion.div
+                  key="report-header"
+                  initial={{ opacity: 0, y: 16 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.5, ease: EASE_SMOOTH }}
+                >
+                  <p className="label-caps mb-4 text-neon-green">
+                    {copy.results.intelligenceReady}
+                  </p>
+                  <h1 className="display-lg font-heading text-ghost-white">
+                    {report.domain}
+                  </h1>
+                  <p className="mt-4 text-sm text-muted">
+                    {copy.common.scannedPrefix}
+                    {new Date(report.scannedAt).toLocaleString()}
+                  </p>
+                </motion.div>
+              ) : (
+                <motion.div
+                  key="mission-header"
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0, y: -12 }}
+                >
+                  <p className="label-caps mb-4">{copy.mission.agentsDeployed}</p>
+                  <h1 className="display-lg font-heading text-ghost-white">
+                    {copy.mission.title}{" "}
+                    <span className="text-gradient">{copy.mission.titleAccent}</span>
+                  </h1>
+                  <p className="mt-4 text-muted">
+                    {copy.common.analyzingPrefix}
+                    <span className="text-ai-blue">{mission.domain}</span>
+                  </p>
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </motion.div>
+
+          <div className="grid gap-8 lg:grid-cols-5 lg:gap-12">
+            <div className="lg:col-span-2">
+              <div className="brave-card p-6 md:p-8">
+                <p className="label-caps mb-6">
+                  {isComplete ? copy.mission.missionComplete : copy.mission.missionProgress}
+                </p>
+                <StageList
+                  currentStage={mission.currentStage}
+                  stageProgress={isComplete ? 100 : mission.stageProgress}
+                  allComplete={isComplete}
+                />
+              </div>
+            </div>
+
+            <div className="space-y-8 lg:col-span-3">
+              <AnimatePresence mode="wait">
+                {showScan && (
+                  <motion.div
+                    key="scan"
+                    initial={{ opacity: 0, scale: 0.98 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    exit={{ opacity: 0, scale: 0.96, y: -20 }}
+                    transition={{ duration: 0.4, ease: EASE_SMOOTH }}
+                  >
+                    <ScanAnimation
+                      url={mission.url}
+                      domain={mission.domain}
+                      active={showScan}
+                      currentStage={mission.currentStage}
+                      stageProgress={mission.stageProgress}
+                    />
+                  </motion.div>
+                )}
+
+                {isComplete && report && (
+                  <motion.div
+                    key="score"
+                    initial={{ opacity: 0, scale: 0.95, y: 20 }}
+                    animate={{ opacity: 1, scale: 1, y: 0 }}
+                    transition={{ duration: 0.6, ease: EASE_SMOOTH }}
+                    className="brave-card flex flex-col items-center justify-center px-6 py-12 md:py-16"
+                  >
+                    <GhostScore score={report.score} />
+                  </motion.div>
+                )}
+
+                {isComplete && !report && (
+                  <motion.div
+                    key="loading"
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    className="brave-card flex min-h-[320px] flex-col items-center justify-center gap-4 p-8"
+                  >
+                    <div className="h-10 w-10 animate-spin rounded-full border-2 border-violet/20 border-t-violet" />
+                    <p className="text-sm text-muted">
+                      {copy.mission.compilingReport}
+                    </p>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+
+              <PersonaCards personas={mission.personas} show={showPersonas} />
+            </div>
+          </div>
+
+          {/* Full report sections appear below the scan area */}
+          {isComplete && report && (
+            <motion.div
+              initial={{ opacity: 0, y: 40 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.6, delay: 0.2, ease: EASE_SMOOTH }}
+              className="mt-16 md:mt-24"
+            >
+              <IntelligenceReportView
+                report={report}
+                compact
+                hideHeader
+                hideScore
+                showNewAnalysisCta
+              />
+            </motion.div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
