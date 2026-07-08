@@ -40,6 +40,8 @@ model Mission {
   url       String
   domain    String
   status    String   @default("running")
+  // Live scan progress for polling across serverless instances.
+  progress  Json?
   // The finished GhostReport, persisted so results survive restarts / are
   // retrievable across instances (not just from the in-memory cache).
   report    Json?

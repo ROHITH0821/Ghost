@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getMissionStatus, startGhostMission } from "@/lib/api/ghost-api";
+import { after } from "next/server";
+import { getMissionStatus, runGhostAudit, startGhostMission } from "@/lib/api/ghost-api";
 import { getSession } from "@/lib/auth";
 import { copy } from "@/lib/copy";
 import { persistMissionStart } from "@/lib/db/missions";
@@ -8,6 +9,8 @@ import { extractDomain } from "@/lib/utils";
 
 // The audit uses Playwright + the Anthropic SDK — force the Node.js runtime.
 export const runtime = "nodejs";
+// Audits can run for several minutes on long-running hosts.
+export const maxDuration = 300;
 
 async function requireSession() {
   const session = await getSession();
@@ -32,19 +35,23 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: copy.authApi.urlRequired }, { status: 400 });
     }
 
-    const result = await startGhostMission({ url });
+    const trimmedUrl = url.trim();
+    const domain = extractDomain(trimmedUrl);
+    const missionId = `mission-${Date.now().toString(36)}`;
 
-    try {
-      const userId = await resolveUserId(session.email);
-      await persistMissionStart({
-        missionId: result.missionId,
-        url: url.trim(),
-        domain: extractDomain(url),
-        userId,
-      });
-    } catch (dbError) {
-      console.error("[analyze] mission persist failed:", dbError);
-    }
+    const userId = await resolveUserId(session.email);
+    await persistMissionStart({
+      missionId,
+      url: trimmedUrl,
+      domain,
+      userId,
+    });
+
+    const result = await startGhostMission({ url: trimmedUrl, missionId });
+
+    after(async () => {
+      await runGhostAudit(missionId, trimmedUrl, domain);
+    });
 
     return NextResponse.json(result);
   } catch (error) {

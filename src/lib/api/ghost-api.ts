@@ -5,9 +5,9 @@
  * GET  /api/analyze?...  → getMissionStatus()   (live scan progress)
  * GET  /api/reports/:id  → getReport()          (final GhostReport)
  *
- * The audit runs in the background (fire-and-forget) and streams progress into
- * an in-memory mission store that the scan animation polls; the finished report
- * is mapped to the UI's GhostReport shape and cached by missionId.
+ * Mission progress is written to Postgres so polling works across serverless
+ * instances (e.g. Vercel). In-memory caches are still used on the instance
+ * running the audit for low-latency updates.
  */
 
 import { createInitialMission } from "../mock-data";
@@ -23,7 +23,9 @@ import { extractDomain } from "../utils";
 
 import {
   getMissionReportFromDb,
+  getMissionStatusFromDb,
   persistMissionError,
+  persistMissionProgress,
   persistMissionReport,
 } from "../db/missions";
 import { ingestUrl } from "../ghost-engine/ingest";
@@ -34,25 +36,45 @@ const missionStore = new Map<string, MissionState>();
 const reportStore = new Map<string, GhostReport>();
 /** missionId → homepage screenshot (data URI) captured during the crawl. */
 const previewStore = new Map<string, string>();
+const persistTimers = new Map<string, ReturnType<typeof setTimeout>>();
 
 export async function startGhostMission(
-  request: AnalyzeRequest
+  request: AnalyzeRequest & { missionId?: string }
 ): Promise<AnalyzeResponse> {
   const domain = extractDomain(request.url);
-  const missionId = `mission-${Date.now().toString(36)}`;
+  const missionId = request.missionId ?? `mission-${Date.now().toString(36)}`;
 
   missionStore.set(missionId, createInitialMission(missionId, request.url, domain));
 
-  // Run the real audit in the background; the client polls mission status.
-  void runRealAudit(missionId, request.url, domain);
-
   return { missionId, status: "started" };
+}
+
+export async function runGhostAudit(
+  missionId: string,
+  url: string,
+  domain?: string
+): Promise<void> {
+  const resolvedDomain = domain ?? extractDomain(url);
+  await runRealAudit(missionId, url, resolvedDomain);
 }
 
 export async function getMissionStatus(
   missionId: string
 ): Promise<MissionState | null> {
-  return missionStore.get(missionId) ?? null;
+  const cached = missionStore.get(missionId);
+  if (cached) return cached;
+
+  try {
+    const persisted = await getMissionStatusFromDb(missionId);
+    if (persisted) {
+      missionStore.set(missionId, persisted);
+      return persisted;
+    }
+  } catch (error) {
+    console.error("[ghost-api] mission status load from db failed:", error);
+  }
+
+  return null;
 }
 
 export async function getReport(missionId: string): Promise<GhostReport | null> {
@@ -79,10 +101,29 @@ export function getMissionPreview(missionId: string): string | null {
 
 // --- internals --------------------------------------------------------------
 
+function schedulePersistMission(missionId: string): void {
+  const existing = persistTimers.get(missionId);
+  if (existing) clearTimeout(existing);
+
+  persistTimers.set(
+    missionId,
+    setTimeout(() => {
+      persistTimers.delete(missionId);
+      const state = missionStore.get(missionId);
+      if (!state) return;
+      void persistMissionProgress(missionId, state).catch((error) => {
+        console.error("[ghost-api] mission progress persist failed:", error);
+      });
+    }, 400)
+  );
+}
+
 function patchMission(missionId: string, patch: Partial<MissionState>): void {
   const current = missionStore.get(missionId);
   if (!current) return;
-  missionStore.set(missionId, { ...current, ...patch });
+  const next = { ...current, ...patch };
+  missionStore.set(missionId, next);
+  schedulePersistMission(missionId);
 }
 
 function setStage(missionId: string, stage: MissionStage, progress: number): void {
@@ -140,17 +181,17 @@ async function runRealAudit(
     const report = toGhostReport(missionId, url, domain, pack, result);
     reportStore.set(missionId, report);
 
-    try {
-      await persistMissionReport(missionId, report);
-    } catch (dbError) {
-      console.error("[ghost-audit] mission report persist failed:", dbError);
-    }
-
     patchMission(missionId, {
       status: "complete",
       currentStage: "generating",
       stageProgress: 100,
     });
+
+    try {
+      await persistMissionReport(missionId, report);
+    } catch (dbError) {
+      console.error("[ghost-audit] mission report persist failed:", dbError);
+    }
   } catch (error) {
     console.error("[ghost-audit]", error);
     const message = friendlyError(error);
