@@ -1,14 +1,11 @@
-import { db } from "@/lib/db";
 import { copy } from "@/lib/copy";
+import { generateOtp, isValidEmail, normalizeEmail } from "./otp";
 import {
-  generateOtp,
-  hashOtp,
-  getOtpExpiry,
-  isOtpExpired,
-  normalizeEmail,
-  isValidEmail,
-  MAX_ATTEMPTS_PER_HOUR,
-} from "./otp";
+  isRateLimited,
+  storePendingOtp,
+  userIdFromEmail,
+  verifyPendingOtp,
+} from "./otp-cookie";
 import { sendOtpEmail } from "./resend";
 import {
   createSessionToken,
@@ -30,41 +27,23 @@ export async function sendLoginOtp(
     return { success: false, message: copy.authApi.invalidEmail };
   }
 
-  const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000);
-  const recentCount = await db.otpToken.count({
-    where: { email: normalized, createdAt: { gte: oneHourAgo } },
-  });
+  if (!process.env.AUTH_SECRET || process.env.AUTH_SECRET.length < 32) {
+    console.error("[auth] AUTH_SECRET missing or too short");
+    return {
+      success: false,
+      message: copy.authApi.somethingWrong,
+    };
+  }
 
-  if (recentCount >= MAX_ATTEMPTS_PER_HOUR) {
+  if (await isRateLimited(normalized)) {
     return {
       success: false,
       message: copy.authApi.tooManyRequests,
     };
   }
 
-  await db.otpToken.updateMany({
-    where: { email: normalized, used: false },
-    data: { used: true },
-  });
-
   const code = generateOtp();
-  const codeHash = hashOtp(code);
-  const expiresAt = getOtpExpiry();
-
-  let user = await db.user.findUnique({ where: { email: normalized } });
-
-  if (!user) {
-    user = await db.user.create({ data: { email: normalized } });
-  }
-
-  await db.otpToken.create({
-    data: {
-      email: normalized,
-      codeHash,
-      expiresAt,
-      userId: user.id,
-    },
-  });
+  await storePendingOtp(normalized, code);
 
   if (!process.env.RESEND_API_KEY) {
     if (process.env.NODE_ENV === "development") {
@@ -105,41 +84,29 @@ export async function verifyLoginOtp(
     return { success: false, message: copy.authApi.invalidEmailOrCode };
   }
 
-  const token = await db.otpToken.findFirst({
-    where: { email: normalized, used: false },
-    orderBy: { createdAt: "desc" },
-  });
+  const verification = await verifyPendingOtp(normalized, code);
 
-  if (!token) {
+  if (!verification.valid) {
+    if (verification.reason === "expired") {
+      return { success: false, message: copy.authApi.codeExpired };
+    }
+    if (verification.reason === "incorrect") {
+      return { success: false, message: copy.authApi.incorrectCode };
+    }
     return { success: false, message: copy.authApi.noActiveCode };
   }
 
-  if (isOtpExpired(token.expiresAt)) {
-    await db.otpToken.update({ where: { id: token.id }, data: { used: true } });
-    return { success: false, message: copy.authApi.codeExpired };
-  }
-
-  if (token.codeHash !== hashOtp(code)) {
-    return { success: false, message: copy.authApi.incorrectCode };
-  }
-
-  await db.otpToken.update({ where: { id: token.id }, data: { used: true } });
-
-  let user = await db.user.findUnique({ where: { email: normalized } });
-  if (!user) {
-    user = await db.user.create({ data: { email: normalized } });
-  }
-
+  const userId = userIdFromEmail(normalized);
   const sessionToken = await createSessionToken({
-    userId: user.id,
-    email: user.email,
+    userId,
+    email: normalized,
   });
   await setSessionCookie(sessionToken);
 
   return {
     success: true,
     message: copy.authApi.signedIn,
-    user: { userId: user.id, email: user.email },
+    user: { userId, email: normalized },
   };
 }
 
@@ -151,10 +118,9 @@ export async function getCurrentUser() {
   const session = await getSession();
   if (!session) return null;
 
-  const user = await db.user.findUnique({
-    where: { id: session.userId },
-    select: { id: true, email: true, createdAt: true },
-  });
-
-  return user;
+  return {
+    id: session.userId,
+    email: session.email,
+    createdAt: new Date(),
+  };
 }

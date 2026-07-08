@@ -33,22 +33,26 @@ export async function POST(request: NextRequest) {
 
     const result = await startGhostMission({ url });
 
-    await db.mission.upsert({
-      where: { id: result.missionId },
-      create: {
-        id: result.missionId,
-        url: url.trim(),
-        domain: extractDomain(url),
-        userId: session.userId,
-        status: "running",
-      },
-      update: {
-        url: url.trim(),
-        domain: extractDomain(url),
-        userId: session.userId,
-        status: "running",
-      },
-    });
+    try {
+      await db.mission.upsert({
+        where: { id: result.missionId },
+        create: {
+          id: result.missionId,
+          url: url.trim(),
+          domain: extractDomain(url),
+          userId: session.userId,
+          status: "running",
+        },
+        update: {
+          url: url.trim(),
+          domain: extractDomain(url),
+          userId: session.userId,
+          status: "running",
+        },
+      });
+    } catch (dbError) {
+      console.warn("[analyze] mission persist skipped:", dbError);
+    }
 
     return NextResponse.json(result);
   } catch (error) {
