@@ -2,7 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { getMissionStatus, startGhostMission } from "@/lib/api/ghost-api";
 import { getSession } from "@/lib/auth";
 import { copy } from "@/lib/copy";
-import { db } from "@/lib/db";
+import { persistMissionStart } from "@/lib/db/missions";
+import { resolveUserId } from "@/lib/db/users";
 import { extractDomain } from "@/lib/utils";
 
 // The audit uses Playwright + the Anthropic SDK — force the Node.js runtime.
@@ -34,24 +35,15 @@ export async function POST(request: NextRequest) {
     const result = await startGhostMission({ url });
 
     try {
-      await db.mission.upsert({
-        where: { id: result.missionId },
-        create: {
-          id: result.missionId,
-          url: url.trim(),
-          domain: extractDomain(url),
-          userId: session.userId,
-          status: "running",
-        },
-        update: {
-          url: url.trim(),
-          domain: extractDomain(url),
-          userId: session.userId,
-          status: "running",
-        },
+      const userId = await resolveUserId(session.email);
+      await persistMissionStart({
+        missionId: result.missionId,
+        url: url.trim(),
+        domain: extractDomain(url),
+        userId,
       });
     } catch (dbError) {
-      console.warn("[analyze] mission persist skipped:", dbError);
+      console.error("[analyze] mission persist failed:", dbError);
     }
 
     return NextResponse.json(result);

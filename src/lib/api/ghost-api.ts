@@ -21,6 +21,11 @@ import type {
 } from "../types";
 import { extractDomain } from "../utils";
 
+import {
+  getMissionReportFromDb,
+  persistMissionError,
+  persistMissionReport,
+} from "../db/missions";
 import { ingestUrl } from "../ghost-engine/ingest";
 import { runAudit } from "../ghost-engine/pipeline";
 import { toGhostReport } from "../ghost-engine/adapter";
@@ -51,7 +56,20 @@ export async function getMissionStatus(
 }
 
 export async function getReport(missionId: string): Promise<GhostReport | null> {
-  return reportStore.get(missionId) ?? null;
+  const cached = reportStore.get(missionId);
+  if (cached) return cached;
+
+  try {
+    const persisted = await getMissionReportFromDb(missionId);
+    if (persisted) {
+      reportStore.set(missionId, persisted);
+      return persisted;
+    }
+  } catch (error) {
+    console.error("[ghost-api] report load from db failed:", error);
+  }
+
+  return null;
 }
 
 /** Homepage screenshot (data URI) for the scan animation, once the crawl runs. */
@@ -122,6 +140,12 @@ async function runRealAudit(
     const report = toGhostReport(missionId, url, domain, pack, result);
     reportStore.set(missionId, report);
 
+    try {
+      await persistMissionReport(missionId, report);
+    } catch (dbError) {
+      console.error("[ghost-audit] mission report persist failed:", dbError);
+    }
+
     patchMission(missionId, {
       status: "complete",
       currentStage: "generating",
@@ -129,7 +153,14 @@ async function runRealAudit(
     });
   } catch (error) {
     console.error("[ghost-audit]", error);
-    patchMission(missionId, { status: "error", error: friendlyError(error) });
+    const message = friendlyError(error);
+    patchMission(missionId, { status: "error", error: message });
+
+    try {
+      await persistMissionError(missionId, message);
+    } catch (dbError) {
+      console.error("[ghost-audit] mission error persist failed:", dbError);
+    }
   }
 }
 

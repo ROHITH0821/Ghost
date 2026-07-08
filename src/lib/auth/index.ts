@@ -1,9 +1,9 @@
 import { copy } from "@/lib/copy";
 import { generateOtp, isValidEmail, normalizeEmail } from "./otp";
+import { resolveUserId, upsertUserByEmail } from "@/lib/db/users";
 import {
   isRateLimited,
   storePendingOtp,
-  userIdFromEmail,
   verifyPendingOtp,
 } from "./otp-cookie";
 import { sendOtpEmail } from "./resend";
@@ -96,7 +96,17 @@ export async function verifyLoginOtp(
     return { success: false, message: copy.authApi.noActiveCode };
   }
 
-  const userId = userIdFromEmail(normalized);
+  let userId: string;
+  try {
+    userId = await resolveUserId(normalized);
+  } catch (error) {
+    console.error("[auth] failed to upsert user:", error);
+    return {
+      success: false,
+      message: copy.authApi.somethingWrong,
+    };
+  }
+
   const sessionToken = await createSessionToken({
     userId,
     email: normalized,
@@ -118,9 +128,19 @@ export async function getCurrentUser() {
   const session = await getSession();
   if (!session) return null;
 
-  return {
-    id: session.userId,
-    email: session.email,
-    createdAt: new Date(),
-  };
+  try {
+    const user = await upsertUserByEmail(session.email);
+    return {
+      id: user.id,
+      email: user.email,
+      createdAt: user.createdAt,
+    };
+  } catch (error) {
+    console.error("[auth] failed to load user:", error);
+    return {
+      id: session.userId,
+      email: session.email,
+      createdAt: new Date(),
+    };
+  }
 }
