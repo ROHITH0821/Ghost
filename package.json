@@ -12,16 +12,20 @@
     "db:studio": "prisma studio"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.110.0",
     "@prisma/client": "^5.22.0",
+    "cheerio": "^1.2.0",
     "clsx": "^2.1.1",
     "framer-motion": "^12.15.0",
     "jose": "^6.2.3",
     "lucide-react": "^0.511.0",
     "next": "^15.3.3",
+    "playwright": "^1.61.1",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "resend": "^6.17.1",
-    "tailwind-merge": "^3.3.0"
+    "tailwind-merge": "^3.3.0",
+    "zod": "^3.25.76"
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3",
@@ -31,7 +35,7 @@
     "@types/react-dom": "^19",
     "eslint": "^9",
     "eslint-config-next": "^15.3.3",
-    "prisma": "^7.8.0",
+    "prisma": "^5.22.0",
     "tailwindcss": "^4",
     "typescript": "^5"
   }

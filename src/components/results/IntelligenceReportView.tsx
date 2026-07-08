@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
-import { Volume2, VolumeX } from "lucide-react";
+import { Download, Volume2, VolumeX } from "lucide-react";
 import type { GhostReport } from "@/lib/types";
 import { ScrollReveal, SectionHeading, TextLink } from "@/components/ui/BRAVE";
 import { GhostScore } from "@/components/results/GhostScore";
@@ -95,24 +95,33 @@ export function IntelligenceReportView({
               <span className="display-lg font-heading text-ghost-white">
                 {report.domain}
               </span>
-              <motion.button
-                whileHover={{ scale: 1.03 }}
-                whileTap={{ scale: 0.97 }}
-                onClick={toggleNarration}
-                className="inline-flex items-center gap-2 self-start rounded-lg border border-violet/30 bg-violet/10 px-4 py-2.5 font-mono text-xs font-semibold uppercase tracking-wider text-violet-glow shadow-[0_0_15px_rgba(139,92,246,0.05)] transition-all hover:border-violet/50 hover:bg-violet/20 md:self-auto"
-              >
-                {isSpeaking ? (
-                  <>
-                    <VolumeX className="h-4 w-4 animate-bounce text-neon-green" />
-                    {copy.results.stopSpeech}
-                  </>
-                ) : (
-                  <>
-                    <Volume2 className="h-4 w-4 text-violet-glow" />
-                    {copy.results.narrateReport}
-                  </>
-                )}
-              </motion.button>
+              <div className="flex flex-wrap items-center gap-3 self-start md:self-auto">
+                <a
+                  href={`/api/reports/${report.id}/pdf`}
+                  className="inline-flex items-center gap-2 rounded-lg border border-neon-green/30 bg-neon-green/10 px-4 py-2.5 font-mono text-xs font-semibold uppercase tracking-wider text-neon-green transition-all hover:border-neon-green/50 hover:bg-neon-green/20"
+                >
+                  <Download className="h-4 w-4" />
+                  {copy.results.downloadPdf}
+                </a>
+                <motion.button
+                  whileHover={{ scale: 1.03 }}
+                  whileTap={{ scale: 0.97 }}
+                  onClick={toggleNarration}
+                  className="inline-flex items-center gap-2 rounded-lg border border-violet/30 bg-violet/10 px-4 py-2.5 font-mono text-xs font-semibold uppercase tracking-wider text-violet-glow shadow-[0_0_15px_rgba(139,92,246,0.05)] transition-all hover:border-violet/50 hover:bg-violet/20"
+                >
+                  {isSpeaking ? (
+                    <>
+                      <VolumeX className="h-4 w-4 animate-bounce text-neon-green" />
+                      {copy.results.stopSpeech}
+                    </>
+                  ) : (
+                    <>
+                      <Volume2 className="h-4 w-4 text-violet-glow" />
+                      {copy.results.narrateReport}
+                    </>
+                  )}
+                </motion.button>
+              </div>
             </div>
             <p className="mt-4 text-sm text-muted">
               {copy.common.scannedPrefix}
@@ -121,7 +130,14 @@ export function IntelligenceReportView({
           </>
         )}
         {hideHeader && (
-          <div className="mb-8 flex justify-end">
+          <div className="mb-8 flex flex-wrap justify-end gap-3">
+            <a
+              href={`/api/reports/${report.id}/pdf`}
+              className="inline-flex items-center gap-2 rounded-lg border border-neon-green/30 bg-neon-green/10 px-4 py-2.5 font-mono text-xs font-semibold uppercase tracking-wider text-neon-green transition-all hover:border-neon-green/50 hover:bg-neon-green/20"
+            >
+              <Download className="h-4 w-4" />
+              {copy.results.downloadPdf}
+            </a>
             <motion.button
               whileHover={{ scale: 1.03 }}
               whileTap={{ scale: 0.97 }}
@@ -131,12 +147,12 @@ export function IntelligenceReportView({
               {isSpeaking ? (
                 <>
                   <VolumeX className="h-4 w-4 animate-bounce text-neon-green" />
-                  Stop speech
+                  {copy.results.stopSpeech}
                 </>
               ) : (
                 <>
                   <Volume2 className="h-4 w-4 text-violet-glow" />
-                  Narrate report
+                  {copy.results.narrateReport}
                 </>
               )}
             </motion.button>

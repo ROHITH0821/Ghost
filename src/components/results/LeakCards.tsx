@@ -1,7 +1,8 @@
 "use client";
 
-import { motion } from "framer-motion";
-import { AlertTriangle, TrendingDown, Wrench } from "lucide-react";
+import { useState } from "react";
+import { motion, AnimatePresence } from "framer-motion";
+import { AlertTriangle, Check, ChevronDown, Copy, TrendingDown, Wrench } from "lucide-react";
 import type { ConversionLeak } from "@/lib/types";
 import { SEVERITY_CONFIG } from "@/lib/constants";
 import { SectionHeading, SectionLabel } from "@/components/ui/BRAVE";
@@ -12,6 +13,21 @@ interface LeakCardsProps {
 }
 
 export function LeakCards({ leaks }: LeakCardsProps) {
+  const [openId, setOpenId] = useState<string | null>(null);
+  const [copiedId, setCopiedId] = useState<string | null>(null);
+
+  const toggle = (id: string) => setOpenId((cur) => (cur === id ? null : id));
+
+  const copyFix = async (id: string, content: string) => {
+    try {
+      await navigator.clipboard.writeText(content);
+      setCopiedId(id);
+      setTimeout(() => setCopiedId(null), 2000);
+    } catch {
+      // clipboard unavailable — no-op
+    }
+  };
+
   return (
     <div>
       <SectionLabel>{copy.results.leaks.label}</SectionLabel>
@@ -27,6 +43,7 @@ export function LeakCards({ leaks }: LeakCardsProps) {
       <div className="space-y-4">
         {leaks.map((leak, index) => {
           const severity = SEVERITY_CONFIG[leak.severity];
+          const isOpen = openId === leak.id;
           return (
             <motion.div
               key={leak.id}
@@ -102,16 +119,71 @@ export function LeakCards({ leaks }: LeakCardsProps) {
                     {leak.impact}
                   </div>
 
-                  <div className="mt-4 flex items-start gap-3 rounded-xl border border-neon-green/10 bg-neon-green/5 p-4">
-                    <Wrench className="mt-0.5 h-4 w-4 shrink-0 text-neon-green" />
-                    <div>
-                      <p className="label-caps mb-1 text-neon-green/70">
+                  {/* How-to-fix dropdown */}
+                  <div className="mt-4 overflow-hidden rounded-xl border border-neon-green/10 bg-neon-green/5">
+                    <button
+                      type="button"
+                      onClick={() => toggle(leak.id)}
+                      aria-expanded={isOpen}
+                      className="flex w-full items-center gap-3 p-4 text-left transition-colors hover:bg-neon-green/[0.08]"
+                    >
+                      <Wrench className="h-4 w-4 shrink-0 text-neon-green" />
+                      <span className="label-caps flex-1 text-neon-green/70">
                         {copy.results.leaks.howToFix}
-                      </p>
-                      <p className="text-sm leading-relaxed text-muted">
-                        {leak.howToFix}
-                      </p>
-                    </div>
+                      </span>
+                      <ChevronDown
+                        className={`h-4 w-4 text-neon-green/70 transition-transform duration-300 ${
+                          isOpen ? "rotate-180" : ""
+                        }`}
+                      />
+                    </button>
+
+                    <AnimatePresence initial={false}>
+                      {isOpen && (
+                        <motion.div
+                          initial={{ height: 0, opacity: 0 }}
+                          animate={{ height: "auto", opacity: 1 }}
+                          exit={{ height: 0, opacity: 0 }}
+                          transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
+                          className="overflow-hidden"
+                        >
+                          <div className="px-4 pb-4">
+                            <p className="text-sm leading-relaxed text-muted">
+                              {leak.howToFix}
+                            </p>
+
+                            {leak.fix && (
+                              <div className="mt-4">
+                                <div className="mb-2 flex items-center justify-between gap-3">
+                                  <span className="text-xs font-semibold text-ghost-white/80">
+                                    {leak.fix.title}
+                                  </span>
+                                  <button
+                                    type="button"
+                                    onClick={() => copyFix(leak.id, leak.fix!.content)}
+                                    className="flex shrink-0 items-center gap-1.5 rounded-lg border border-border px-3 py-1.5 text-xs text-muted transition-colors hover:border-violet/30 hover:text-ghost-white"
+                                  >
+                                    {copiedId === leak.id ? (
+                                      <Check className="h-3.5 w-3.5 text-neon-green" />
+                                    ) : (
+                                      <Copy className="h-3.5 w-3.5" />
+                                    )}
+                                    {copiedId === leak.id
+                                      ? copy.common.copied
+                                      : copy.common.copy}
+                                  </button>
+                                </div>
+                                <div className="rounded-lg bg-midnight p-4 font-mono text-xs leading-relaxed">
+                                  <pre className="whitespace-pre-wrap text-muted">
+                                    {leak.fix.content}
+                                  </pre>
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
                   </div>
                 </div>
               </div>

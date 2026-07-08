@@ -55,6 +55,8 @@ export interface ConversionLeak {
   impact: string;
   howToFix: string;
   category: string;
+  /** The full ready-to-paste fix for this leak, revealed in the How-to-fix dropdown. */
+  fix?: { title: string; content: string };
 }
 
 export interface AIFix {
@@ -87,6 +89,8 @@ export interface MissionState {
   stageProgress: number;
   personas: ShopperPersona[];
   startedAt: string;
+  /** Human-readable reason, set when status is "error". */
+  error?: string;
 }
 
 export interface AnalyzeRequest {

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import type { MissionStage } from "@/lib/types";
 import { copy } from "@/lib/copy";
@@ -8,6 +8,7 @@ import { copy } from "@/lib/copy";
 interface ScanAnimationProps {
   url: string;
   domain: string;
+  missionId: string;
   active: boolean;
   currentStage: MissionStage;
   stageProgress: number;
@@ -52,6 +53,7 @@ function useTypewriter(text: string, speed = 28) {
 export function ScanAnimation({
   url,
   domain,
+  missionId,
   active,
   currentStage,
   stageProgress,
@@ -62,40 +64,18 @@ export function ScanAnimation({
   const [elementsScanned, setElementsScanned] = useState(0);
   const [screenshotUrl, setScreenshotUrl] = useState<string | null>(null);
   const [loadProgress, setLoadProgress] = useState(0);
-  const iframeRef = useRef<HTMLIFrameElement>(null);
-  const fallbackFetched = useRef(false);
   const isLiveRef = useRef(false);
 
   const targetUrl = url.startsWith("http") ? url : `https://${url}`;
 
-  const fetchScreenshot = useCallback(async () => {
-    if (fallbackFetched.current) return;
-    fallbackFetched.current = true;
-    try {
-      const res = await fetch(
-        `/api/site-preview?url=${encodeURIComponent(targetUrl)}`
-      );
-      const data = await res.json();
-      if (data.imageUrl) {
-        setScreenshotUrl(data.imageUrl);
-        isLiveRef.current = true;
-        setPhase("live");
-      } else {
-        setPhase("fallback");
-      }
-    } catch {
-      setPhase("fallback");
-    }
-  }, [targetUrl]);
-
-  // Simulated connection → fetch → render pipeline
+  // Loading-overlay pipeline (connecting → fetching → rendering) until the real
+  // screenshot arrives from the poll below.
   useEffect(() => {
     if (!active) return;
 
     setPhase("connecting");
     setLoadProgress(0);
     setScreenshotUrl(null);
-    fallbackFetched.current = false;
     isLiveRef.current = false;
 
     const t1 = setTimeout(() => {
@@ -107,28 +87,60 @@ export function ScanAnimation({
       setLoadProgress(55);
     }, 1400);
 
+    // Creep toward (but never reach) 95% while we wait — the poll snaps to 100.
     const progressInterval = setInterval(() => {
-      setLoadProgress((p) => Math.min(p + 1, 90));
-    }, 120);
-
-    const fallbackTimer = setTimeout(() => {
-      if (!isLiveRef.current) fetchScreenshot();
-    }, 7000);
+      setLoadProgress((p) => (isLiveRef.current ? p : Math.min(p + 1, 95)));
+    }, 140);
 
     return () => {
       clearTimeout(t1);
       clearTimeout(t2);
       clearInterval(progressInterval);
-      clearTimeout(fallbackTimer);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [active, targetUrl]);
+  }, [active, missionId]);
 
-  const handleIframeLoad = () => {
-    isLiveRef.current = true;
-    setPhase("live");
-    setLoadProgress(100);
-  };
+  // Poll for THIS mission's real homepage screenshot (captured during the crawl).
+  useEffect(() => {
+    if (!active) return;
+    let cancelled = false;
+    let timer: ReturnType<typeof setTimeout>;
+    let tries = 0;
+    const MAX_TRIES = 40; // ~60s safety net
+
+    const poll = async () => {
+      if (cancelled || isLiveRef.current) return;
+      tries += 1;
+      try {
+        const res = await fetch(
+          `/api/site-preview?missionId=${encodeURIComponent(missionId)}&url=${encodeURIComponent(targetUrl)}`
+        );
+        const data = await res.json();
+        if (!cancelled && data.imageUrl) {
+          setScreenshotUrl(data.imageUrl as string);
+          isLiveRef.current = true;
+          setPhase("live");
+          setLoadProgress(100);
+          return; // stop polling — we're live
+        }
+        if (!cancelled && data.fallback) {
+          setPhase("fallback"); // crawl produced nothing and the fallback failed
+          return;
+        }
+      } catch {
+        // transient — retry
+      }
+      if (!cancelled && !isLiveRef.current && tries < MAX_TRIES) {
+        timer = setTimeout(poll, 1500);
+      }
+    };
+
+    timer = setTimeout(poll, 700);
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [active, missionId, targetUrl]);
 
   // Stage-synced terminal logs
   useEffect(() => {
@@ -207,29 +219,13 @@ export function ScanAnimation({
 
       {/* Viewport */}
       <div className="relative aspect-[16/10] overflow-hidden bg-midnight">
-        {/* Live website preview with scroll simulation */}
+        {/* Real crawled screenshot with a slow scroll simulation */}
         <div className="absolute inset-0 overflow-hidden">
           <motion.div
             className="absolute inset-x-0 top-0"
-            animate={
-              showPreview ? { y: [0, -80, -200, -120, 0] } : { y: 0 }
-            }
+            animate={showPreview ? { y: [0, -80, -200, -120, 0] } : { y: 0 }}
             transition={{ duration: 18, repeat: Infinity, ease: "easeInOut" }}
           >
-            {!screenshotUrl && (
-              <iframe
-                ref={iframeRef}
-                src={targetUrl}
-                onLoad={handleIframeLoad}
-                className="pointer-events-none h-[220%] w-full select-none border-0 bg-white"
-                title={copy.scan.iframeTitle}
-                style={{
-                  opacity: isLive ? 0.88 : 0,
-                  transition: "opacity 1.2s ease",
-                }}
-              />
-            )}
-
             {screenshotUrl && (
               <motion.img
                 src={screenshotUrl}
@@ -237,7 +233,7 @@ export function ScanAnimation({
                 initial={{ opacity: 0, scale: 1.04 }}
                 animate={{ opacity: 0.92, scale: 1 }}
                 transition={{ duration: 1.2 }}
-                className="pointer-events-none h-[220%] w-full object-cover object-top select-none"
+                className="pointer-events-none w-full select-none object-cover object-top"
               />
             )}
           </motion.div>
@@ -271,7 +267,7 @@ export function ScanAnimation({
           )}
         </AnimatePresence>
 
-        {/* Fallback wireframe when both iframe & screenshot fail */}
+        {/* Fallback wireframe when no screenshot is available */}
         {phase === "fallback" && !screenshotUrl && (
           <div className="absolute inset-0 z-10 flex flex-col p-8 opacity-30">
             <div className="mb-4 h-6 w-2/3 rounded bg-violet/20" />

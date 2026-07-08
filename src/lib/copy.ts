@@ -305,6 +305,12 @@ export const copy = {
     notFound: "Mission not found",
     shoppersActive: "AI shoppers active",
     analyzingFallback: "Analyzing...",
+    failed: {
+      heading: "The scan hit a snag",
+      body: "Ghost couldn't finish auditing this site.",
+      retry: "Try again",
+      scanAnother: "Scan another site",
+    },
   },
 
   stages: [
@@ -452,6 +458,7 @@ export const copy = {
     reportNotFound: "Report not found",
     narrateReport: "Narrate report",
     stopSpeech: "Stop speech",
+    downloadPdf: "Download PDF",
     scanAnotherHeading: "Scan another",
     scanAnotherAccent: "site?",
     ghostScore: "Ghost Score",

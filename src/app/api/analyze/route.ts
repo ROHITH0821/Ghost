@@ -5,6 +5,9 @@ import { copy } from "@/lib/copy";
 import { db } from "@/lib/db";
 import { extractDomain } from "@/lib/utils";
 
+// The audit uses Playwright + the Anthropic SDK — force the Node.js runtime.
+export const runtime = "nodejs";
+
 async function requireSession() {
   const session = await getSession();
   if (!session) {

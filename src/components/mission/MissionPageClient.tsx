@@ -55,6 +55,8 @@ export function MissionPageClient({ missionId }: MissionPageClientProps) {
         if (data.mission.status === "complete") {
           clearInterval(interval);
           await fetchReport();
+        } else if (data.mission.status === "error") {
+          clearInterval(interval);
         }
       } catch {
         setError(true);

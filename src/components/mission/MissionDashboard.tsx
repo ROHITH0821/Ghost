@@ -1,7 +1,9 @@
 "use client";
 
+import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
-import { CheckCircle2, Radio } from "lucide-react";
+import { AlertTriangle, CheckCircle2, Radio, RotateCw } from "lucide-react";
 import type { GhostReport, MissionState } from "@/lib/types";
 import { StageList } from "./StageList";
 import { PersonaCards } from "./PersonaCards";
@@ -18,15 +20,39 @@ interface MissionDashboardProps {
 }
 
 export function MissionDashboard({ mission, report }: MissionDashboardProps) {
+  const router = useRouter();
+  const [retrying, setRetrying] = useState(false);
+
+  const isError = mission.status === "error";
   const isComplete = mission.status === "complete";
   const showPersonas =
     !isComplete &&
+    !isError &&
     (mission.currentStage === "deploying" ||
       mission.currentStage === "testing" ||
       mission.currentStage === "leaks" ||
       mission.currentStage === "generating");
 
   const showScan = mission.status === "running";
+
+  const handleRetry = async () => {
+    setRetrying(true);
+    try {
+      const res = await fetch("/api/analyze", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ url: mission.url }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        router.push(`/mission/${data.missionId}`);
+        return;
+      }
+    } catch {
+      // fall through to re-enable the button
+    }
+    setRetrying(false);
+  };
 
   return (
     <div className="relative min-h-screen">
@@ -43,6 +69,11 @@ export function MissionDashboard({ mission, report }: MissionDashboardProps) {
                 <span className="hidden items-center gap-2 text-xs text-neon-green sm:flex">
                   <CheckCircle2 className="h-3.5 w-3.5" />
                   {copy.mission.reportReady}
+                </span>
+              ) : isError ? (
+                <span className="hidden items-center gap-2 text-xs text-danger sm:flex">
+                  <AlertTriangle className="h-3.5 w-3.5" />
+                  {copy.mission.failed.heading}
                 </span>
               ) : (
                 <span className="hidden items-center gap-2 text-xs text-muted sm:flex">
@@ -101,6 +132,46 @@ export function MissionDashboard({ mission, report }: MissionDashboardProps) {
             </AnimatePresence>
           </motion.div>
 
+          {isError && (
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.5, ease: EASE_SMOOTH }}
+              className="mx-auto max-w-2xl"
+            >
+              <div className="brave-card flex flex-col items-center px-6 py-14 text-center md:px-10 md:py-20">
+                <div className="mb-6 flex h-16 w-16 items-center justify-center rounded-2xl border border-danger/30 bg-danger/10">
+                  <AlertTriangle className="h-7 w-7 text-danger" />
+                </div>
+                <h2 className="font-heading text-2xl font-bold text-ghost-white md:text-3xl">
+                  {copy.mission.failed.heading}
+                </h2>
+                <p className="mt-3 max-w-md text-sm leading-relaxed text-muted md:text-base">
+                  {mission.error ?? copy.mission.failed.body}
+                </p>
+                <div className="mt-8 flex flex-col items-center gap-4 sm:flex-row">
+                  <button
+                    type="button"
+                    onClick={handleRetry}
+                    disabled={retrying}
+                    className="inline-flex items-center gap-2 rounded-xl border border-violet/40 bg-violet/15 px-6 py-3 font-mono text-sm font-semibold uppercase tracking-wider text-violet-glow transition-all hover:border-violet/60 hover:bg-violet/25 disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    <RotateCw className={`h-4 w-4 ${retrying ? "animate-spin" : ""}`} />
+                    {copy.mission.failed.retry}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => router.push("/")}
+                    className="text-sm text-muted underline-offset-4 transition-colors hover:text-ghost-white hover:underline"
+                  >
+                    {copy.mission.failed.scanAnother}
+                  </button>
+                </div>
+              </div>
+            </motion.div>
+          )}
+
+          {!isError && (
           <div className="grid gap-8 lg:grid-cols-5 lg:gap-12">
             <div className="lg:col-span-2">
               <div className="brave-card p-6 md:p-8">
@@ -128,6 +199,7 @@ export function MissionDashboard({ mission, report }: MissionDashboardProps) {
                     <ScanAnimation
                       url={mission.url}
                       domain={mission.domain}
+                      missionId={mission.id}
                       active={showScan}
                       currentStage={mission.currentStage}
                       stageProgress={mission.stageProgress}
@@ -165,6 +237,7 @@ export function MissionDashboard({ mission, report }: MissionDashboardProps) {
               <PersonaCards personas={mission.personas} show={showPersonas} />
             </div>
           </div>
+          )}
 
           {/* Full report sections appear below the scan area */}
           {isComplete && report && (
