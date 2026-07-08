@@ -15,7 +15,11 @@ function getResend(): Resend {
 }
 
 export function getFromEmail(): string {
-  return process.env.RESEND_FROM_EMAIL ?? "Ghost <onboarding@resend.dev>";
+  const from = process.env.RESEND_FROM_EMAIL ?? "Ghost <onboarding@resend.dev>";
+  if (from.includes("<") && from.includes(">")) {
+    return from;
+  }
+  return `Ghost <${from}>`;
 }
 
 export async function sendOtpEmail(
