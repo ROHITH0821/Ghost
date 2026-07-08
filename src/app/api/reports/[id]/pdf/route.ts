@@ -6,6 +6,7 @@ import { generateGhostReportPdf } from "@/lib/report/reportPdf";
 
 // PDF generation uses Playwright — force the Node.js runtime.
 export const runtime = "nodejs";
+export const maxDuration = 60;
 
 export async function GET(
   _request: NextRequest,

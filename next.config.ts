@@ -13,7 +13,13 @@ const nextConfig: NextConfig = {
   // Keep heavy/native server-only packages out of the bundle — they're required
   // at runtime (Node) rather than bundled. Playwright ships native binaries;
   // cheerio and the Anthropic SDK are server-only too.
-  serverExternalPackages: ["playwright", "cheerio", "@anthropic-ai/sdk"],
+  serverExternalPackages: [
+    "playwright",
+    "playwright-core",
+    "@sparticuz/chromium",
+    "cheerio",
+    "@anthropic-ai/sdk",
+  ],
 };
 
 export default nextConfig;

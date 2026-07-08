@@ -1,9 +1,8 @@
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 
-import { chromium } from "playwright";
-
 import type { ConversionLeak, GhostReport, Severity } from "@/lib/types";
+import { launchPdfBrowser } from "./launchBrowser";
 
 /**
  * Generates the downloadable branded PDF from a GhostReport (the same data the
@@ -187,10 +186,10 @@ export async function generateGhostReportPdf(report: GhostReport): Promise<Uint8
   const logo = await loadLogo();
   const html = buildReportHtml(report, logo);
 
-  const browser = await chromium.launch({ args: ["--no-sandbox"] });
+  const browser = await launchPdfBrowser();
   try {
     const page = await browser.newPage();
-    await page.setContent(html, { waitUntil: "networkidle" });
+    await page.setContent(html, { waitUntil: "domcontentloaded" });
     const pdf = await page.pdf({
       format: "A4",
       printBackground: true,
