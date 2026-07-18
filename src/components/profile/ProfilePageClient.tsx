@@ -175,7 +175,7 @@ export function ProfilePageClient({
         <div className="mb-8 flex flex-col justify-between gap-6 md:flex-row md:items-end">
           <div>
             <p className="label-caps text-muted">{copy.nav.profile}</p>
-            <h1 className="mt-3 font-heading text-3xl font-bold text-ghost-white md:text-4xl">
+            <h1 className="mt-3 break-words font-heading text-2xl font-bold text-ghost-white sm:text-3xl md:text-4xl">
               {headline}
               <span className="text-ghost-white/50">.ghost</span>
             </h1>

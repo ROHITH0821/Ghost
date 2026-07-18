@@ -47,7 +47,11 @@ export function Header() {
           ))}
         </nav>
 
-        <UserMenu />
+        {/* ml-auto keeps the menu right-aligned even when the nav is hidden
+            on mobile (the nav's mr-auto disappears with it). */}
+        <div className="ml-auto">
+          <UserMenu />
+        </div>
       </div>
     </motion.header>
   );
