@@ -1,6 +1,6 @@
 import { copy } from "@/lib/copy";
 import { generateOtp, isValidEmail, normalizeEmail } from "./otp";
-import { resolveUserId, upsertUserByEmail } from "@/lib/db/users";
+import { resolveUserId } from "@/lib/db/users";
 import {
   isRateLimited,
   storePendingOtp,
@@ -122,25 +122,4 @@ export async function verifyLoginOtp(
 
 export async function logout(): Promise<void> {
   await clearSessionCookie();
-}
-
-export async function getCurrentUser() {
-  const session = await getSession();
-  if (!session) return null;
-
-  try {
-    const user = await upsertUserByEmail(session.email);
-    return {
-      id: user.id,
-      email: user.email,
-      createdAt: user.createdAt,
-    };
-  } catch (error) {
-    console.error("[auth] failed to load user:", error);
-    return {
-      id: session.userId,
-      email: session.email,
-      createdAt: new Date(),
-    };
-  }
 }

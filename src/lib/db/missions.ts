@@ -225,24 +225,39 @@ export async function getRecentMissionsForUser(input: {
   userId: string;
   limit?: number;
 }): Promise<RecentMissionRow[]> {
-  const missions = await db.mission.findMany({
-    where: { userId: input.userId },
-    orderBy: { createdAt: "desc" },
-    take: input.limit ?? 12,
-    select: {
-      id: true,
-      url: true,
-      domain: true,
-      status: true,
-      progress: true,
-      pdfUrl: true,
-      createdAt: true,
-      updatedAt: true,
-    },
-  });
+  // `progress` can be hundreds of KB per row (it may embed a base64 preview
+  // screenshot), so project only the keys the profile list actually renders
+  // instead of pulling the whole JSON column across the wire.
+  const rows = await db.$queryRaw<
+    Array<{
+      id: string;
+      url: string;
+      domain: string;
+      status: string;
+      pdfUrl: string | null;
+      createdAt: Date;
+      updatedAt: Date;
+      currentStage: string | null;
+      stageProgress: number | null;
+      error: string | null;
+    }>
+  >`
+    SELECT id, url, domain, status, "pdfUrl", "createdAt", "updatedAt",
+           progress->>'currentStage'           AS "currentStage",
+           (progress->>'stageProgress')::float AS "stageProgress",
+           progress->>'error'                  AS "error"
+    FROM "Mission"
+    WHERE "userId" = ${input.userId}
+    ORDER BY "createdAt" DESC
+    LIMIT ${input.limit ?? 12}`;
 
-  return missions.map((m) => ({
-    ...m,
-    progress: (m.progress ?? null) as RecentMissionRow["progress"],
+  return rows.map(({ currentStage, stageProgress, error, ...rest }) => ({
+    ...rest,
+    progress: {
+      currentStage:
+        (currentStage as MissionState["currentStage"] | null) ?? undefined,
+      stageProgress: stageProgress ?? undefined,
+      error: error ?? undefined,
+    },
   }));
 }

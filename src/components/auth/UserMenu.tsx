@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { TextLink } from "@/components/ui/BRAVE";
@@ -23,21 +24,19 @@ export function UserMenu() {
 
   return (
     <div className="flex items-center gap-4">
-      <button
-        type="button"
-        onClick={() => router.push("/profile")}
+      <Link
+        href="/profile"
         className="hidden max-w-[220px] truncate text-sm text-muted-light transition-colors hover:text-ghost-white sm:block"
         title={user.email}
       >
         {user.email}
-      </button>
-      <button
-        type="button"
-        onClick={() => router.push("/profile")}
+      </Link>
+      <Link
+        href="/profile"
         className="rounded-xl border border-border bg-surface/30 px-3 py-1.5 text-sm text-ghost-white/70 transition-colors hover:text-ghost-white"
       >
         Profile
-      </button>
+      </Link>
       <button
         type="button"
         onClick={async () => {

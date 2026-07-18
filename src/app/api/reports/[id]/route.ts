@@ -25,5 +25,10 @@ export async function GET(
     );
   }
 
-  return NextResponse.json({ report });
+  // Completed reports are immutable, so let the browser reuse them briefly
+  // instead of refetching ~20KB of JSON on every results-page visit.
+  return NextResponse.json(
+    { report },
+    { headers: { "Cache-Control": "private, max-age=300" } }
+  );
 }

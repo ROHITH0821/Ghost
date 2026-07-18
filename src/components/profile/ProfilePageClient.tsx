@@ -3,8 +3,9 @@
 import { useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Clock, FileText, Settings2, Shield, SlidersHorizontal } from "lucide-react";
+import { Clock, Download, FileText, Settings2, Shield, SlidersHorizontal } from "lucide-react";
 import { GhostLogo } from "@/components/ui/GhostLogo";
+import { LocalTime } from "@/components/ui/LocalTime";
 import { TextLink } from "@/components/ui/BRAVE";
 import type { RecentMissionRow } from "@/lib/db/missions";
 import { copy } from "@/lib/copy";
@@ -23,16 +24,6 @@ const STATUS_STYLES: Record<string, { label: string; cls: string }> = {
 
 function domainLabel(input: string) {
   return input.replace(/^https?:\/\//, "").replace(/\/$/, "");
-}
-
-function formatWhen(date: Date | string) {
-  const d = typeof date === "string" ? new Date(date) : date;
-  return d.toLocaleString(undefined, {
-    month: "short",
-    day: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
 }
 
 function Pill({
@@ -63,7 +54,10 @@ function Card({
   right?: React.ReactNode;
 }) {
   return (
-    <section className="rounded-2xl border border-border bg-surface/40 p-6 backdrop-blur-sm">
+    // min-w-0 lets the card shrink inside its grid track (grid items default
+    // to min-width:auto), so unbreakable content like long URLs truncates
+    // instead of blowing the layout out horizontally.
+    <section className="min-w-0 overflow-hidden rounded-2xl border border-border bg-surface/40 p-6 backdrop-blur-sm">
       <header className="mb-4 flex items-start justify-between gap-4">
         <div className="flex items-center gap-3">
           <div className="grid h-10 w-10 place-items-center rounded-xl bg-midnight/80 text-ghost-white/70">
@@ -187,7 +181,7 @@ export function ProfilePageClient({
             </h1>
             <p className="mt-3 text-sm text-muted-light">
               Signed in as <span className="text-ghost-white/80">{user.email}</span>. Joined{" "}
-              {formatWhen(user.createdAt)}.
+              <LocalTime date={user.createdAt} />.
             </p>
           </div>
 
@@ -313,7 +307,7 @@ export function ProfilePageClient({
                 </div>
                 <div className="rounded-2xl border border-border/60 bg-midnight/40 p-4">
                   <p className="label-caps text-muted">Member since</p>
-                  <p className="mt-2 text-sm text-ghost-white/90">{formatWhen(user.createdAt)}</p>
+                  <p className="mt-2 text-sm text-ghost-white/90"><LocalTime date={user.createdAt} /></p>
                 </div>
                 <p className="text-xs text-muted">
                   Tip: If you change your email, you’ll sign in again with a new code.
@@ -378,7 +372,7 @@ function MissionRow({ mission, compact }: { mission: RecentMissionRow; compact: 
         <p className="mt-2 truncate text-xs text-muted">{mission.url}</p>
 
         <div className="mt-3 flex flex-wrap items-center gap-3 text-xs text-muted-light">
-          <span>Started {formatWhen(mission.createdAt)}</span>
+          <span>Started <LocalTime date={mission.createdAt} /></span>
           {progress !== null && mission.status === "running" && (
             <span>
               Stage {stage} • {progress}%
@@ -391,24 +385,41 @@ function MissionRow({ mission, compact }: { mission: RecentMissionRow; compact: 
       </div>
 
       <div className="flex shrink-0 flex-wrap gap-3">
-        {mission.status === "complete" && mission.pdfUrl ? (
+        {mission.status === "complete" && (
+          <>
+            <Link
+              href={`/results/${mission.id}`}
+              className="rounded-xl border border-border bg-surface/40 px-4 py-2 text-sm font-medium text-ghost-white/80 transition-colors hover:text-ghost-white"
+            >
+              View report
+            </Link>
+            {/* Served from storage when available, generated on demand otherwise. */}
+            <a
+              href={`/api/reports/${mission.id}/pdf`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="rounded-xl bg-violet px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-violet-dim"
+            >
+              View PDF
+            </a>
+            <a
+              href={`/api/reports/${mission.id}/pdf?download=1`}
+              className="flex items-center gap-1.5 rounded-xl border border-violet/40 bg-violet/10 px-4 py-2 text-sm font-medium text-violet transition-colors hover:bg-violet/20"
+              title="Download PDF"
+            >
+              <Download className="h-4 w-4" />
+              Download
+            </a>
+          </>
+        )}
+        {mission.status === "running" && (
           <Link
-            href={`/api/reports/${mission.id}/pdf`}
-            download
-            className="rounded-xl bg-violet px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-violet-dim"
+            href={`/mission/${mission.id}`}
+            className="rounded-xl border border-border bg-surface/40 px-4 py-2 text-sm font-medium text-ghost-white/80 transition-colors hover:text-ghost-white"
           >
-            PDF
+            View progress
           </Link>
-        ) : mission.status === "complete" ? (
-          <button
-            type="button"
-            disabled
-            className="cursor-not-allowed rounded-xl bg-violet/40 px-4 py-2 text-sm font-medium text-white/70"
-            title="PDF download is coming soon"
-          >
-            PDF (coming soon)
-          </button>
-        ) : null}
+        )}
       </div>
     </div>
   );

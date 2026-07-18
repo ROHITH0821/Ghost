@@ -1,15 +1,14 @@
 import { NextResponse } from "next/server";
-import { getCurrentUser } from "@/lib/auth";
+import { getSession } from "@/lib/auth";
 
+// The session JWT already carries the user's id and email, so this endpoint —
+// hit by AuthProvider on every page mount — never needs a DB round-trip.
 export async function GET() {
-  try {
-    const user = await getCurrentUser();
-    if (!user) {
-      return NextResponse.json({ user: null });
-    }
-    return NextResponse.json({ user });
-  } catch (error) {
-    console.error("[me]", error);
-    return NextResponse.json({ user: null }, { status: 500 });
+  const session = await getSession();
+  if (!session) {
+    return NextResponse.json({ user: null });
   }
+  return NextResponse.json({
+    user: { id: session.userId, email: session.email },
+  });
 }
