@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { Inter, Space_Grotesk } from "next/font/google";
 import { AuthProvider } from "@/components/auth/AuthProvider";
 import { SiteBackground } from "@/components/layout/SiteBackground";
+import { WhatsAppFloat } from "@/components/layout/WhatsAppFloat";
 import { copy } from "@/lib/copy";
 import "./globals.css";
 
@@ -47,6 +48,7 @@ export default function RootLayout({
         <div className="relative z-10">
           <AuthProvider>{children}</AuthProvider>
         </div>
+        <WhatsAppFloat />
       </body>
     </html>
   );
