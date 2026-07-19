@@ -13,6 +13,10 @@ import { IntelligenceReportView } from "@/components/results/IntelligenceReportV
 import { GhostScore } from "@/components/results/GhostScore";
 import { copy } from "@/lib/copy";
 import { EASE_SMOOTH } from "@/lib/motion";
+import {
+  MaintenanceModal,
+  isEngineOfflinePayload,
+} from "@/components/ui/MaintenanceModal";
 
 interface MissionDashboardProps {
   mission: MissionState;
@@ -22,6 +26,7 @@ interface MissionDashboardProps {
 export function MissionDashboard({ mission, report }: MissionDashboardProps) {
   const router = useRouter();
   const [retrying, setRetrying] = useState(false);
+  const [maintenanceOpen, setMaintenanceOpen] = useState(false);
 
   const isError = mission.status === "error";
   const isComplete = mission.status === "complete";
@@ -44,8 +49,13 @@ export function MissionDashboard({ mission, report }: MissionDashboardProps) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ url: mission.url }),
       });
-      if (res.ok) {
-        const data = await res.json();
+      const data = await res.json().catch(() => ({}));
+      if (res.status === 503 || isEngineOfflinePayload(data)) {
+        setMaintenanceOpen(true);
+        setRetrying(false);
+        return;
+      }
+      if (res.ok && data.missionId) {
         router.push(`/mission/${data.missionId}`);
         return;
       }
@@ -260,6 +270,12 @@ export function MissionDashboard({ mission, report }: MissionDashboardProps) {
           )}
         </div>
       </div>
+
+      <MaintenanceModal
+        open={maintenanceOpen}
+        onClose={() => setMaintenanceOpen(false)}
+        url={mission.url}
+      />
     </div>
   );
 }

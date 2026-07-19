@@ -282,6 +282,20 @@ export const copy = {
     missionIdRequired: "missionId is required",
     missionNotFound: "Mission not found",
     reportNotFound: "Report not found",
+    engineOffline: "Ghost is under maintenance",
+  },
+
+  maintenance: {
+    eyebrow: "Temporarily offline",
+    title: "Ghost is under maintenance",
+    titleAccent: "We'll be back soon",
+    body: "Our AI shoppers are resting and recharging. Summoning is paused for a short while — hang tight.",
+    bodyWithUrl: (url: string) =>
+      `We saved your request for ${url}. Ghost will walk that site as soon as the swarm is back online.`,
+    hint: "Try again in a little while. Nothing's wrong with your link.",
+    dismiss: "Got it",
+    statusLabel: "Status",
+    statusValue: "Maintenance mode",
   },
 
   email: {

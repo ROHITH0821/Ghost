@@ -5,6 +5,10 @@ import { useRouter } from "next/navigation";
 import { motion, useScroll, useTransform } from "framer-motion";
 import { ArrowRight } from "lucide-react";
 import { Button } from "@/components/ui/Button";
+import {
+  MaintenanceModal,
+  isEngineOfflinePayload,
+} from "@/components/ui/MaintenanceModal";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { EASE_SMOOTH } from "@/lib/motion";
 import { copy } from "@/lib/copy";
@@ -13,6 +17,7 @@ import { redirectToLogin } from "@/lib/auth/redirect-to-login";
 export function Hero() {
   const [url, setUrl] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [maintenanceOpen, setMaintenanceOpen] = useState(false);
   const router = useRouter();
   const [isFocused, setIsFocused] = useState(false);
   const { user, loading: authLoading } = useAuth();
@@ -23,10 +28,7 @@ export function Hero() {
     offset: ["start start", "end start"],
   });
 
-  // Keep the GHOST title pinned relative to the viewport by translating it down as we scroll
   const yTitle = scrollY;
-  
-  // Smooth opacity and scale decay as page scrolls
   const opacityTitle = useTransform(scrollYProgress, [0, 0.4], [1, 0]);
   const scaleTitle = useTransform(scrollYProgress, [0, 0.4], [1, 0.95]);
 
@@ -55,6 +57,12 @@ export function Hero() {
       }
 
       const data = await res.json();
+
+      if (res.status === 503 || isEngineOfflinePayload(data)) {
+        setMaintenanceOpen(true);
+        return;
+      }
+
       if (data.missionId) {
         router.push(`/mission/${data.missionId}`);
       }
@@ -75,7 +83,6 @@ export function Hero() {
       <div className="absolute top-1/3 left-1/4 -z-10 h-[200px] w-[200px] rounded-full bg-ai-blue/5 blur-[100px]" />
 
       <div className="mx-auto w-full max-w-[1200px] text-center">
-        {/* Sub-label at the top */}
         <motion.div
           initial={{ opacity: 0, y: 16 }}
           animate={{ opacity: 1, y: 0 }}
@@ -88,7 +95,6 @@ export function Hero() {
           <div className="mt-4 h-px w-[120px] bg-gradient-to-r from-transparent via-violet/50 to-transparent" />
         </motion.div>
 
-        {/* Pinned Massive Display Title in relative flow */}
         <div className="relative z-0 select-none pointer-events-none my-6">
           <motion.h1
             style={{ y: yTitle, scale: scaleTitle, opacity: opacityTitle }}
@@ -117,7 +123,6 @@ export function Hero() {
                 </div>
               </div>
 
-              {/* Input Form Area */}
               <div className="flex flex-col gap-2 p-3 sm:flex-row sm:items-center">
                 <div className="relative flex-1 flex items-center">
                   <span className="font-mono text-violet/60 pl-3 select-none text-base md:text-lg">&gt;</span>
@@ -152,7 +157,6 @@ export function Hero() {
             </div>
           </motion.div>
 
-          {/* Description */}
           <motion.p
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
@@ -163,6 +167,12 @@ export function Hero() {
           </motion.p>
         </div>
       </div>
+
+      <MaintenanceModal
+        open={maintenanceOpen}
+        onClose={() => setMaintenanceOpen(false)}
+        url={url.trim()}
+      />
     </section>
   );
 }

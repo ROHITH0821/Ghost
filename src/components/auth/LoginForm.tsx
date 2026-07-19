@@ -9,6 +9,10 @@ import { useAuth } from "@/components/auth/AuthProvider";
 import { EASE_SMOOTH } from "@/lib/motion";
 import { GhostLogo } from "@/components/ui/GhostLogo";
 import { copy } from "@/lib/copy";
+import {
+  MaintenanceModal,
+  isEngineOfflinePayload,
+} from "@/components/ui/MaintenanceModal";
 
 type Step = "email" | "otp";
 
@@ -19,6 +23,7 @@ export function LoginForm() {
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
+  const [maintenanceOpen, setMaintenanceOpen] = useState(false);
   const inputRefs = useRef<(HTMLInputElement | null)[]>([]);
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -85,6 +90,10 @@ export function LoginForm() {
             return;
           }
           const analyzeData = await analyzeRes.json();
+          if (analyzeRes.status === 503 || isEngineOfflinePayload(analyzeData)) {
+            setMaintenanceOpen(true);
+            return;
+          }
           if (analyzeData.missionId) {
             router.push(`/mission/${analyzeData.missionId}`);
             return;
@@ -263,6 +272,12 @@ export function LoginForm() {
           </motion.div>
         )}
       </AnimatePresence>
+
+      <MaintenanceModal
+        open={maintenanceOpen}
+        onClose={() => setMaintenanceOpen(false)}
+        url={pendingUrl}
+      />
     </div>
   );
 }

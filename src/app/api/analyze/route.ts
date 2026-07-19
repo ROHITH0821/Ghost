@@ -4,6 +4,7 @@ import { getSession } from "@/lib/auth";
 import { copy } from "@/lib/copy";
 import { persistMissionStart } from "@/lib/db/missions";
 import { resolveUserId } from "@/lib/db/users";
+import { ENGINE_OFFLINE_CODE, isEngineConfigured } from "@/lib/engine/status";
 import { extractDomain } from "@/lib/utils";
 
 // The audit uses Playwright + the Anthropic SDK — force the Node.js runtime.
@@ -26,6 +27,17 @@ export async function POST(request: NextRequest) {
   try {
     const session = await requireSession();
     if (session instanceof NextResponse) return session;
+
+    if (!isEngineConfigured()) {
+      return NextResponse.json(
+        {
+          error: copy.authApi.engineOffline,
+          code: ENGINE_OFFLINE_CODE,
+          message: copy.maintenance.body,
+        },
+        { status: 503 }
+      );
+    }
 
     const body = await request.json();
     const { url } = body;
